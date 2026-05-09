@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { completion } from '@rocketnew/llm-sdk';
-import { AI_REQUEST_TIMEOUT_MS } from '@/lib/ai/constants';
 
-/** حدّ تنفيذ الدالة على Vercel (ثوانٍ). يطابق مهلة العميل في `lib/ai/constants.ts`. على Hobby غالباً 10 كحد أقصى فعلي — لـ 20 ث استخدم Pro */
-export const maxDuration = Math.floor(AI_REQUEST_TIMEOUT_MS / 1000);
+/** يجب أن يبقى رقماً ثابتاً (لا دالة ولا متغير) — Next.js/Vercel يحلّلان الملف ثابتاً. يطابق 20 ث في `lib/ai/constants.ts` (20000 ms). */
+export const maxDuration = 20;
 
 const API_KEYS: Record<string, string | undefined> = {
   OPEN_AI: process.env.OPENAI_API_KEY,
