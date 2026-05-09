@@ -18,6 +18,20 @@ interface LoginFormProps {
   onSwitchToSignup: () => void;
 }
 
+function loginErrorMessage(raw: string): string {
+  const m = raw.toLowerCase();
+  if (m.includes('email not confirmed') || m.includes('not confirmed')) {
+    return 'البريد غير مؤكّد بعد. افتح الرسالة التي أرسلناها إلى بريدك واضغط رابط التأكيد (تحقق من «غير المرغوب»). أو من لوحة Supabase → Authentication → Users يمكنك تأكيد المستخدم يدوياً.';
+  }
+  if (m.includes('invalid login') || m.includes('invalid credentials')) {
+    return 'بيانات الدخول غير صحيحة';
+  }
+  if (m.includes('too many requests') || m.includes('rate limit') || m.includes('429')) {
+    return 'محاولات كثيرة. انتظر دقيقة أو اثنتين ثم أعد المحاولة.';
+  }
+  return raw;
+}
+
 export default function LoginForm({ onForgotPassword, onSwitchToSignup }: LoginFormProps) {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
@@ -43,9 +57,7 @@ export default function LoginForm({ onForgotPassword, onSwitchToSignup }: LoginF
     if (error) {
       setIsLoading(false);
       setError('root', {
-        message: error.message.includes('Invalid login')
-          ? 'بيانات الدخول غير صحيحة'
-          : error.message,
+        message: loginErrorMessage(error.message),
       });
       return;
     }
