@@ -50,6 +50,14 @@ export default function SheetUploadForm({ onSuccess }: SheetUploadFormProps) {
 
     setUploading(true);
     try {
+      // التحقق من وجود الـ bucket
+      const { data: buckets, error: bucketsErr } = await supabase.storage.listBuckets();
+      if (bucketsErr || !buckets?.some(b => b.name === 'sheets')) {
+        toast.error('Bucket "sheets" غير موجود. اذهب إلى Supabase Dashboard → Storage → Create bucket → اسمه "sheets"');
+        setUploading(false);
+        return;
+      }
+
       const { error: upErr } = await supabase.storage.from('sheets').upload(path, file, {
         cacheControl: '3600',
         upsert: false,
@@ -57,7 +65,11 @@ export default function SheetUploadForm({ onSuccess }: SheetUploadFormProps) {
       });
       if (upErr) {
         console.error(upErr);
-        toast.error(upErr.message || 'فشل الرفع للتخزين — هل شغّلت ترحيل SQL للـ bucket sheets؟');
+        if (upErr.message?.includes('not found')) {
+          toast.error('Bucket "sheets" غير موجود. اذهب إلى Supabase Dashboard → Storage → Create bucket → اسمه "sheets" → Create');
+        } else {
+          toast.error(upErr.message || 'فشل الرفع للتخزين');
+        }
         return;
       }
 
