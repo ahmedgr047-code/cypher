@@ -305,13 +305,14 @@ html.light .subject-tag {
     50% { box-shadow: 0 0 0 4px rgba(34, 197, 94, 0); }
   }
 
-  .telegram-badge {
-    background: rgba(37, 150, 190, 0.15);
-    border: 1px solid rgba(37, 150, 190, 0.3);
-    color: #29B6D8;
+  .sheet-archive-badge {
+    background: rgba(232, 25, 44, 0.12);
+    border: 1px solid rgba(232, 25, 44, 0.28);
+    color: var(--primary);
     border-radius: 6px;
     font-size: 11px;
     padding: 2px 8px;
+    font-weight: 600;
   }
 
   .semester-badge {

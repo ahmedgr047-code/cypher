@@ -253,7 +253,7 @@ function FileDeliveryCard({ fileCard }: { fileCard: NonNullable<Message['fileCar
       <div className="flex flex-wrap gap-1.5 mb-3">
         <span className="semester-badge">{fileCard.semester}</span>
         <span className="subject-tag">{fileCard.subjectCode}</span>
-        <span className="telegram-badge">📨 تلغرام</span>
+        <span className="sheet-archive-badge">📚 أرشيف</span>
       </div>
       <div className="flex items-center gap-3 text-xs text-muted-foreground mb-3 font-mono-data">
         <span>{fileCard.fileSize}</span>

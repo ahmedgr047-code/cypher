@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Search, Plus, X, MessageSquare, BookOpen, LogOut, Settings } from 'lucide-react';
+import Link from 'next/link';
+import { Search, Plus, X, MessageSquare, BookOpen, LogOut, Settings, Upload } from 'lucide-react';
 import type { Conversation, SubjectRow } from '@/types/chat';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
@@ -131,6 +132,15 @@ export default function ChatSidebar({
           <BookOpen size={15} />
           <span>كتالوج المواد</span>
         </button>
+
+        <Link
+          href="/admin"
+          onClick={() => onClose()}
+          className="sidebar-item w-full flex items-center gap-2.5 px-3 py-2 text-sm text-muted-foreground"
+        >
+          <Upload size={15} />
+          <span>رفع شيت للأرشيف</span>
+        </Link>
 
         <button
           type="button"

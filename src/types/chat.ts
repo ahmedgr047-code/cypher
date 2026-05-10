@@ -7,7 +7,7 @@ export interface FileCard {
   fileSize: string;
   pages: number;
   downloadUrl: string;
-  source: 'telegram';
+  source: 'archive';
 }
 
 export interface Message {

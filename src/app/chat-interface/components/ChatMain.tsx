@@ -29,8 +29,8 @@ export default function ChatMain({
   conversationTitle,
   quickChips,
   inputPlaceholder = 'اكتب سؤالك أو ارفع ملفاً للتحليل…',
-  emptySubtitle = 'أخبرني باسم المادة والفصل الدراسي وسأجلب لك الشيت أو المنهج فوراً من قناة الدكتور على تلغرام',
-  footerNote = 'مرتبط بقنوات تلغرام معهد الشموخ',
+  emptySubtitle = 'أخبرني باسم المادة وسأساعدك؛ الشيتات المطابقة تُستخرج من أرشيف المعهد.',
+  footerNote = 'معهد الشموخ — أرشيف الشيتات والمناهج',
   connectedLabel = 'Cypher متصل',
 }: ChatMainProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);

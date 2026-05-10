@@ -29,13 +29,13 @@ export async function GET(request: Request) {
 
   const [{ data: byName, error: e1 }, { data: byCaption, error: e2 }] = await Promise.all([
     supabase
-      .from('telegram_sheets')
+      .from('sheet_archive')
       .select('id,file_name,caption,file_size,mime_type,created_at')
       .ilike('file_name', pattern)
       .order('created_at', { ascending: false })
       .limit(10),
     supabase
-      .from('telegram_sheets')
+      .from('sheet_archive')
       .select('id,file_name,caption,file_size,mime_type,created_at')
       .ilike('caption', pattern)
       .order('created_at', { ascending: false })
