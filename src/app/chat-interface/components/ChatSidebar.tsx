@@ -1,11 +1,12 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Search, Plus, X, MessageSquare, BookOpen, LogOut } from 'lucide-react';
+import { Search, Plus, X, MessageSquare, BookOpen, LogOut, Settings } from 'lucide-react';
 import type { Conversation, SubjectRow } from '@/types/chat';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
+import { useUserSettings } from '@/components/providers/UserSettingsProvider';
 
 interface ChatSidebarProps {
   conversations: Conversation[];
@@ -13,6 +14,7 @@ interface ChatSidebarProps {
   onSelectConv: (id: string) => void;
   onNewChat: () => void;
   onClose: () => void;
+  onOpenSettings: () => void;
   user: { fullName: string; email: string; studentId: string | null };
 }
 
@@ -22,8 +24,10 @@ export default function ChatSidebar({
   onSelectConv,
   onNewChat,
   onClose,
+  onOpenSettings,
   user,
 }: ChatSidebarProps) {
+  const { locale } = useUserSettings();
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [catalogOpen, setCatalogOpen] = useState(false);
@@ -128,6 +132,18 @@ export default function ChatSidebar({
           <span>كتالوج المواد</span>
         </button>
 
+        <button
+          type="button"
+          onClick={() => {
+            onOpenSettings();
+            onClose();
+          }}
+          className="sidebar-item w-full flex items-center gap-2.5 px-3 py-2 text-sm text-muted-foreground"
+        >
+          <Settings size={15} />
+          <span>{locale === 'en' ? 'Settings' : 'الإعدادات'}</span>
+        </button>
+
         <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl">
           <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
             <span className="text-xs font-bold text-white">{initial}</span>
@@ -139,6 +155,7 @@ export default function ChatSidebar({
             </p>
           </div>
           <button
+            type="button"
             onClick={handleLogout}
             className="btn-ghost p-1 rounded-md flex-shrink-0"
             aria-label="تسجيل الخروج"

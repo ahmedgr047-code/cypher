@@ -25,6 +25,46 @@
   --font-mono: 'JetBrains Mono', monospace;
 }
 
+html.light {
+  --background: #f4f4f5;
+  --foreground: #18181b;
+  --primary: #c81e2e;
+  --primary-foreground: #ffffff;
+  --secondary: #e4e4e7;
+  --secondary-foreground: #52525b;
+  --accent: #dc2626;
+  --accent-foreground: #ffffff;
+  --muted: #e4e4e7;
+  --muted-foreground: #71717a;
+  --card: #ffffff;
+  --card-foreground: #18181b;
+  --border: #d4d4d8;
+  --input: #fafafa;
+  --ring: #c81e2e;
+}
+
+html.light .scrollbar-thin {
+  scrollbar-color: #d4d4d8 transparent;
+}
+
+html.light .scrollbar-thin::-webkit-scrollbar-thumb {
+  background-color: #d4d4d8;
+}
+
+html.light .file-card {
+  background: linear-gradient(145deg, #fafafa 0%, #f4f4f5 100%);
+  border: 1px solid var(--border);
+}
+
+html.light .overlay-backdrop {
+  background: rgba(24, 24, 27, 0.55);
+}
+
+html.light .subject-tag {
+  background: rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
 @layer base {
   * {
     box-sizing: border-box;

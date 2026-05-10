@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import '../styles/tailwind.css';
 import { Toaster } from 'sonner';
+import { UserSettingsProvider } from '@/components/providers/UserSettingsProvider';
 
 const geist = Geist({
   subsets: ['latin'],
@@ -36,9 +37,9 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="ar" dir="rtl" className={`${geist.variable} ${geistMono.variable}`}>
+    <html lang="ar" dir="rtl" suppressHydrationWarning className={`${geist.variable} ${geistMono.variable}`}>
       <body className={geist.className}>
-        {children}
+        <UserSettingsProvider>{children}</UserSettingsProvider>
         <Toaster
           position="bottom-right"
           toastOptions={{

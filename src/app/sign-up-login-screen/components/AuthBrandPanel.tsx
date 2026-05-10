@@ -43,7 +43,7 @@ export default function AuthBrandPanel() {
         <div className="mt-10 flex flex-col gap-3 w-full max-w-xs">
           {[
             { icon: '📚', label: 'جميع الشيتات والمناهج في مكان واحد' },
-            { icon: '⚡', label: 'استجابة فورية عبر بوت تلغرام' },
+            { icon: '⚡', label: 'مساعدة دراسية فورية داخل المنصة' },
             { icon: '🔒', label: 'حساب شخصي آمن لكل طالب' },
           ]?.map((f) => (
             <div

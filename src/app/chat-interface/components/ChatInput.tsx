@@ -12,6 +12,7 @@ export interface AttachedFile {
 interface ChatInputProps {
   onSend: (text: string, attachment?: AttachedFile) => void;
   disabled: boolean;
+  placeholder?: string;
 }
 
 async function fileToBase64DataUri(file: File): Promise<string> {
@@ -23,7 +24,11 @@ async function fileToBase64DataUri(file: File): Promise<string> {
   });
 }
 
-export default function ChatInput({ onSend, disabled }: ChatInputProps) {
+export default function ChatInput({
+  onSend,
+  disabled,
+  placeholder = 'اكتب سؤالك أو ارفع ملفاً للتحليل…',
+}: ChatInputProps) {
   const [value, setValue] = useState('');
   const [attachedFile, setAttachedFile] = useState<AttachedFile | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -127,7 +132,7 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
             onChange={(e) => setValue(e.target.value)}
             onKeyDown={handleKeyDown}
             onInput={handleInput}
-            placeholder="اكتب سؤالك أو ارفع ملفاً للتحليل..."
+            placeholder={placeholder}
             disabled={disabled}
             rows={1}
             className="input-field w-full px-4 py-3 text-sm resize-none overflow-hidden placeholder-muted-foreground leading-relaxed"

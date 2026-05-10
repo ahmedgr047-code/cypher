@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import ChatSidebar from './ChatSidebar';
 import ChatMain from './ChatMain';
+import SettingsPanel from './SettingsPanel';
 import type { Message, Conversation, FileCard } from '@/types/chat';
 import { AttachedFile } from './ChatInput';
 import toast from 'react-hot-toast';
@@ -10,11 +11,38 @@ import { getChatCompletionWithFailover } from '@/lib/ai/chatCompletion';
 import { AI_MAX_HISTORY_CHARS, AI_MAX_HISTORY_MESSAGES } from '@/lib/ai/constants';
 import { formatRelativeAr } from '@/lib/formatRelativeAr';
 import { formatBytes } from '@/lib/formatBytes';
+import { useUserSettings } from '@/components/providers/UserSettingsProvider';
+import { chatT } from '@/lib/chat-i18n';
 
-const SYSTEM_PROMPT = `Cypher — مساعد معهد الشموخ (أحمد قريز). عربي، مهذب، إجابات مختصرة.
-ساعد بالشرح والتلخيص؛ استخدم قائمة الشيتات أدناه إن وُجدت.
-أنهِ الرد بقسم "🎬 مقاطع يوتيوب مقترحة:" ورابطين فقط بصيغة [عنوان](https://youtube.com/...).
-صورة/ملف: شرح مختصر. لا تخترع شيتاً خارج القائمة.`;
+const BASE_SYSTEM_PROMPT = `أنت Cypher، بوت مساعدة خاص بمعهد الشموخ فقط. اسمك أمام المستخدم: Cypher.
+طوّرك المهندس والطالب أحمد قريز. لا تذكر Google أو OpenAI أو Anthropic أو Groq أو أي شركة أو اسم نموذج خارجي.
+
+إذا سُئلت عن الهوية أو المنشئ أو «من صنعك» أو «من أنت» أو «ما اسمك» أو «من أنشأك» أو «انت مني» أو ما شابه — أجب باختصار: أنت بوت معهد الشموخ، اسمك Cypher، طورك أحمد قريز، دون الإشارة لشركات أو نماذج عالمية.
+
+لا تضف قسماً عن مقاطع يوتيوب أو روابط فيديو ما لم يطلب المستخدم ذلك صراحةً في رسالته الحالية (كلمات مثل: يوتيوب، youtube، فيديو، مقاطع، فيديوهات، شرح مرئي).
+
+مهمتك: مساعدة الطلاب أكاديمياً بالعربية؛ استخدم قائمة الشيتات أدناه إن وُجدت. صورة أو ملف: شرح مختصر. لا تخترع شيتاً خارج القائمة.`;
+
+function userRequestedYoutube(text: string): boolean {
+  const t = text.trim();
+  if (!t) return false;
+  return /يوتيوب|youtube|فيديو|مقطع|فيديوهات|شرح\s+مرئي/i.test(t);
+}
+
+function composeSystemContent(
+  sheetBlock: string,
+  personaExtra: string,
+  wantsYoutube: boolean
+): string {
+  let s = BASE_SYSTEM_PROMPT + sheetBlock;
+  if (personaExtra.trim()) {
+    s += `\n\n[توجيهات إضافية من المستخدم لهذا الجهاز]\n${personaExtra.trim()}`;
+  }
+  if (wantsYoutube) {
+    s += `\n\nالمستخدم طلب مقاطع فيديو صراحةً: أنهِ الرد بقسم "🎬 مقاطع يوتيوب مقترحة:" مع رابطين حقيقيين بصيغة [عنوان](رابط يوتيوب).`;
+  }
+  return s;
+}
 
 type DbMessage = {
   id: string;
@@ -119,6 +147,8 @@ function mapConv(row: {
 }
 
 export default function ChatLayout() {
+  const { locale, botPersona } = useUserSettings();
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeConvId, setActiveConvId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -135,6 +165,16 @@ export default function ChatLayout() {
   });
   const [bootstrapped, setBootstrapped] = useState(false);
   const loadingThreadRef = useRef(false);
+
+  const ui = useMemo(
+    () => ({
+      connected: chatT(locale, 'connected'),
+      placeholderInput: chatT(locale, 'placeholderInput'),
+      emptySubtitle: chatT(locale, 'emptySubtitle'),
+      footerNote: chatT(locale, 'footerNote'),
+    }),
+    [locale]
+  );
 
   const refreshConversations = useCallback(async () => {
     const r = await fetch('/api/conversations');
@@ -315,8 +355,10 @@ export default function ChatLayout() {
 
       const sheetBlock = buildSheetBlock(sheets);
       const apiTail = clipHistoryForApi(newHistory);
+      const youtubeAsk = userRequestedYoutube(q);
+      const systemContent = composeSystemContent(sheetBlock, botPersona, youtubeAsk);
       const apiMessages = [
-        { role: 'system' as const, content: SYSTEM_PROMPT + sheetBlock },
+        { role: 'system' as const, content: systemContent },
         ...apiTail.map((h) => ({
           role: h.role === 'assistant' ? ('assistant' as const) : ('user' as const),
           content: h.content,
@@ -412,6 +454,7 @@ export default function ChatLayout() {
           onSelectConv={handleSelectConv}
           onNewChat={handleNewChat}
           onClose={() => setSidebarOpen(false)}
+          onOpenSettings={() => setSettingsOpen(true)}
           user={userBar}
         />
       </div>
@@ -426,8 +469,14 @@ export default function ChatLayout() {
             conversations.find((c) => c.id === activeConvId)?.title ?? 'محادثة جديدة'
           }
           quickChips={quickChips}
+          inputPlaceholder={ui.placeholderInput}
+          emptySubtitle={ui.emptySubtitle}
+          footerNote={ui.footerNote}
+          connectedLabel={ui.connected}
         />
       </div>
+
+      <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} user={userBar} />
     </div>
   );
 }

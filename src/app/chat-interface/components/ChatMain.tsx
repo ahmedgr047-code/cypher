@@ -15,6 +15,10 @@ interface ChatMainProps {
   onOpenSidebar: () => void;
   conversationTitle: string;
   quickChips: string[];
+  inputPlaceholder?: string;
+  emptySubtitle?: string;
+  footerNote?: string;
+  connectedLabel?: string;
 }
 
 export default function ChatMain({
@@ -24,6 +28,10 @@ export default function ChatMain({
   onOpenSidebar,
   conversationTitle,
   quickChips,
+  inputPlaceholder = 'اكتب سؤالك أو ارفع ملفاً للتحليل…',
+  emptySubtitle = 'أخبرني باسم المادة والفصل الدراسي وسأجلب لك الشيت أو المنهج فوراً من قناة الدكتور على تلغرام',
+  footerNote = 'مرتبط بقنوات تلغرام معهد الشموخ',
+  connectedLabel = 'Cypher متصل',
 }: ChatMainProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -56,7 +64,7 @@ export default function ChatMain({
         <div className="flex items-center gap-2 flex-shrink-0">
           <div className="flex items-center gap-1.5">
             <span className="status-online w-2 h-2 flex-shrink-0" />
-            <span className="text-xs text-muted-foreground hidden sm:block">Cypher متصل</span>
+            <span className="text-xs text-muted-foreground hidden sm:block">{connectedLabel}</span>
           </div>
           <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center glow-red-sm">
             <Bot size={16} className="text-white" />
@@ -70,7 +78,12 @@ export default function ChatMain({
         style={{ WebkitOverflowScrolling: 'touch' }}
       >
         {isEmpty ? (
-          <EmptyChat quickChips={quickChips} onChipClick={onSendMessage} />
+          <EmptyChat
+            quickChips={quickChips}
+            onChipClick={onSendMessage}
+            subtitle={emptySubtitle}
+            footerNote={footerNote}
+          />
         ) : (
           <>
             {messages.map((msg) => (
@@ -101,7 +114,7 @@ export default function ChatMain({
 
       {/* Input */}
       <div className="flex-shrink-0 border-t border-border bg-card">
-        <ChatInput onSend={onSendMessage} disabled={isTyping} />
+        <ChatInput onSend={onSendMessage} disabled={isTyping} placeholder={inputPlaceholder} />
       </div>
     </div>
   );
@@ -110,9 +123,13 @@ export default function ChatMain({
 function EmptyChat({
   quickChips,
   onChipClick,
+  subtitle,
+  footerNote,
 }: {
   quickChips: string[];
   onChipClick: (text: string) => void;
+  subtitle: string;
+  footerNote: string;
 }) {
   return (
     <div className="flex flex-col items-center justify-center h-full min-h-[60vh] px-4 text-center">
@@ -139,9 +156,7 @@ function EmptyChat({
       </div>
 
       <h2 className="text-xl font-bold text-foreground mb-2">كيف يمكنني مساعدتك؟</h2>
-      <p className="text-sm text-muted-foreground mb-8 max-w-sm leading-relaxed">
-        أخبرني باسم المادة والفصل الدراسي وسأجلب لك الشيت أو المنهج فوراً من قناة الدكتور على تلغرام
-      </p>
+      <p className="text-sm text-muted-foreground mb-8 max-w-sm leading-relaxed">{subtitle}</p>
 
       {/* Quick chips grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-md">
@@ -159,7 +174,7 @@ function EmptyChat({
 
       <div className="mt-8 flex items-center gap-2 text-xs text-muted-foreground">
         <RotateCcw size={12} />
-        <span>مرتبط بقنوات تلغرام معهد الشموخ</span>
+        <span>{footerNote}</span>
       </div>
     </div>
   );
