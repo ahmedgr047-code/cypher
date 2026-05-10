@@ -21,6 +21,13 @@ function formatErrorResponse(error: unknown, provider?: string) {
   };
 }
 
+/** رمز خطأ مزوّد الذكاء الاصطناعي (مثل 404 لموديل محذوف) لا يُعرَض كـ 404 لمسار Next — يُربك المتصفح */
+function httpStatusForUpstreamFailure(upstreamCode: number): number {
+  if (upstreamCode === 404 || upstreamCode === 410) return 502;
+  if (upstreamCode < 400 || upstreamCode >= 600) return 502;
+  return upstreamCode;
+}
+
 export async function POST(request: NextRequest) {
   let body: any = {};
 
@@ -100,7 +107,7 @@ export async function POST(request: NextRequest) {
       });
       return NextResponse.json(
         { error: formatted.error, details: formatted.details },
-        { status: formatted.statusCode }
+        { status: httpStatusForUpstreamFailure(formatted.statusCode) }
       );
     }
 
@@ -177,7 +184,7 @@ export async function POST(request: NextRequest) {
     console.error('API Route Error:', { error: formatted.error, details: formatted.details });
     return NextResponse.json(
       { error: formatted.error, details: formatted.details },
-      { status: formatted.statusCode }
+      { status: httpStatusForUpstreamFailure(formatted.statusCode) }
     );
   }
 }

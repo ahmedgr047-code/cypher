@@ -7,9 +7,12 @@ export type AiFailoverEntry = {
   model: string;
 };
 
-/** افتراضياً: Gemini 1.5 Flash (سريع وخفيف)، ثم Groq الأصغر استهلاكاً (8B instant)، ثم OpenAI. يُستبدَل عبر `AI_MODEL_CHAIN_JSON`. */
+/**
+ * افتراضياً: Gemini 2.5 Flash (متوافق مع واجهة Google الحالية؛ 1.5 أزيل/لا يُعاد).
+ * ثم Groq 8B، ثم OpenAI. يُستبدَل عبر `AI_MODEL_CHAIN_JSON`.
+ */
 export const DEFAULT_AI_FAILOVER_CHAIN: AiFailoverEntry[] = [
-  { provider: 'GEMINI', model: 'gemini/gemini-1.5-flash' },
+  { provider: 'GEMINI', model: 'gemini/gemini-2.5-flash' },
   { provider: 'GROQ', model: 'groq/llama-3.1-8b-instant' },
   { provider: 'OPEN_AI', model: 'gpt-4o-mini' },
 ];
@@ -88,6 +91,8 @@ export function shouldFailOverToNextModel(error: unknown): boolean {
 
   if (status === 429 || status === 503 || status === 502 || status === 408) return true;
   if (status === 402 || status === 403) return true;
+  /* موديل Google معطّل/غير موجود — ننتقل لـ Groq */
+  if (status === 404 || status === 410) return true;
 
   const msg = `${error instanceof Error ? error.message : String(error)}`.toLowerCase();
   const patterns = [
@@ -107,6 +112,11 @@ export function shouldFailOverToNextModel(error: unknown): boolean {
     'temporarily',
     'try again',
     'limit exceeded',
+    'not_found',
+    'not found',
+    'notfound',
+    'geminiexception',
+    'deprecated',
   ];
   if (patterns.some((p) => msg.includes(p))) return true;
 
