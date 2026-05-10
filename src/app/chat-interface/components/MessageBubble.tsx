@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, memo } from 'react';
 import { Download, FileText, Loader2, CheckCircle, ExternalLink } from 'lucide-react';
 import type { Message } from '@/types/chat';
 import { toast } from 'sonner';
@@ -93,7 +93,7 @@ function renderInline(text: string): React.ReactNode {
   });
 }
 
-export default function MessageBubble({ message }: MessageBubbleProps) {
+function MessageBubble({ message }: MessageBubbleProps) {
   const isUser = message.role === 'user';
   const { text, youtubeLinks } = isUser ? { text: message.content, youtubeLinks: [] } : parseContent(message.content);
 
@@ -209,6 +209,8 @@ export default function MessageBubble({ message }: MessageBubbleProps) {
     </div>
   );
 }
+
+export default memo(MessageBubble);
 
 function FileDeliveryCard({ fileCard }: { fileCard: NonNullable<Message['fileCard']> }) {
   const [downloading, setDownloading] = useState(false);

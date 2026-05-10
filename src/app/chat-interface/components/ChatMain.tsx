@@ -28,7 +28,8 @@ export default function ChatMain({
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    // `auto` أوفر للمحاكيات والأجهزة الضعيفة من `smooth`
+    messagesEndRef.current?.scrollIntoView({ behavior: 'auto', block: 'end' });
   }, [messages, isTyping]);
 
   const isEmpty = messages.length === 0;
@@ -63,8 +64,11 @@ export default function ChatMain({
         </div>
       </div>
 
-      {/* Messages area */}
-      <div className="flex-1 overflow-y-auto scrollbar-thin px-4 py-4 space-y-4">
+      {/* Messages area — overscroll-behavior يقلل التعليق على اللمس */}
+      <div
+        className="flex-1 overflow-y-auto overscroll-y-contain scrollbar-thin px-4 py-4 space-y-4 [contain:content]"
+        style={{ WebkitOverflowScrolling: 'touch' }}
+      >
         {isEmpty ? (
           <EmptyChat quickChips={quickChips} onChipClick={onSendMessage} />
         ) : (
@@ -73,12 +77,8 @@ export default function ChatMain({
               <MessageBubble key={msg.id} message={msg} />
             ))}
             {isTyping && <TypingIndicator />}
-            <div ref={messagesEndRef} />
+            <div ref={messagesEndRef} aria-hidden />
           </>
-        )}
-
-        {!isEmpty && !isTyping && (
-          <div ref={messagesEndRef} />
         )}
       </div>
 

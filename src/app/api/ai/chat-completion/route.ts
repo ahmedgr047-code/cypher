@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { completion } from '@rocketnew/llm-sdk';
+import {
+  getAiFailoverChain,
+  getApiKeysForProvider,
+  shouldFailOverToNextModel,
+} from '@/lib/ai/modelChain';
 
-/** يجب أن يبقى رقماً ثابتاً (لا دالة ولا متغير) — Next.js/Vercel يحلّلان الملف ثابتاً. يطابق 20 ث في `lib/ai/constants.ts` (20000 ms). */
-export const maxDuration = 20;
+/** يجب أن يبقى رقماً ثابتاً — يطابق 10 ث في `lib/ai/constants.ts` (10000 ms). */
+export const maxDuration = 10;
 
-const API_KEYS: Record<string, string | undefined> = {
-  OPEN_AI: process.env.OPENAI_API_KEY,
-  ANTHROPIC: process.env.ANTHROPIC_API_KEY,
-  GEMINI: process.env.GEMINI_API_KEY,
-  PERPLEXITY: process.env.PERPLEXITY_API_KEY,
-};
 
 function formatErrorResponse(error: unknown, provider?: string) {
   const statusCode = (error as any)?.statusCode || (error as any)?.status || 500;
@@ -27,19 +26,100 @@ export async function POST(request: NextRequest) {
 
   try {
     body = await request.json();
-    const { provider, model, messages, stream = false, parameters = {} } = body;
+    const { provider, model, messages, stream = false, parameters = {}, failover } = body;
 
-    if (!provider || !model || !messages?.length) {
+    const useFailover = failover === true;
+
+    if (!messages?.length) {
       return NextResponse.json(
-        { error: 'Missing required fields: provider, model, messages', details: 'Request validation failed' },
+        { error: 'Missing required field: messages', details: 'Request validation failed' },
         { status: 400 }
       );
     }
 
-    const apiKey = API_KEYS[provider];
+    if (useFailover) {
+      if (stream) {
+        return NextResponse.json(
+          {
+            error: 'Streaming with failover is not supported',
+            details: 'Use stream: false when failover is enabled',
+          },
+          { status: 400 }
+        );
+      }
+
+      const chain = getAiFailoverChain();
+      let lastError: unknown;
+      let attempted = false;
+
+      outer: for (const entry of chain) {
+        const keys = getApiKeysForProvider(entry.provider);
+        if (!keys.length) continue;
+
+        for (let keyIndex = 0; keyIndex < keys.length; keyIndex++) {
+          const apiKey = keys[keyIndex];
+          attempted = true;
+          try {
+            const response = await completion({
+              model: entry.model,
+              messages,
+              stream: false,
+              api_key: apiKey,
+              ...parameters,
+            });
+
+            return NextResponse.json(response, {
+              headers: {
+                'X-Cypher-AI-Provider': entry.provider,
+                'X-Cypher-AI-Model': entry.model,
+                'X-Cypher-AI-Key-Slot': String(keyIndex + 1),
+              },
+            });
+          } catch (error) {
+            lastError = error;
+            if (!shouldFailOverToNextModel(error)) break outer;
+          }
+        }
+      }
+
+      if (!attempted) {
+        return NextResponse.json(
+          {
+            error: 'No AI API keys configured for failover',
+            details:
+              'Add GEMINI_API_KEY_1 / GEMINI_API_KEY_2 and/or GROQ_API_KEY_1 / GROQ_API_KEY_2 and/or OPENAI_API_KEY (انظر .env.example)',
+          },
+          { status: 503 }
+        );
+      }
+
+      const formatted = formatErrorResponse(lastError, chain[0]?.provider);
+      console.error('API Route Error (failover exhausted):', {
+        error: formatted.error,
+        details: formatted.details,
+      });
+      return NextResponse.json(
+        { error: formatted.error, details: formatted.details },
+        { status: formatted.statusCode }
+      );
+    }
+
+    if (!provider || !model) {
+      return NextResponse.json(
+        { error: 'Missing required fields: provider, model (or set failover: true)', details: 'Request validation failed' },
+        { status: 400 }
+      );
+    }
+
+    const providerKeys = getApiKeysForProvider(provider);
+    const apiKey = providerKeys[0];
     if (!apiKey) {
       return NextResponse.json(
-        { error: `${provider.toUpperCase()} API key is not configured`, details: 'The API key for this provider is missing in environment variables' },
+        {
+          error: `${provider.toUpperCase()} API key is not configured`,
+          details:
+            'For GEMINI use GEMINI_API_KEY_1 / GEMINI_API_KEY_2; for GROQ use GROQ_API_KEY_1 / GROQ_API_KEY_2 (see Vercel Environment Variables)',
+        },
         { status: 400 }
       );
     }

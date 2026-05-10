@@ -6,15 +6,15 @@ import ChatMain from './ChatMain';
 import type { Message, Conversation, FileCard } from '@/types/chat';
 import { AttachedFile } from './ChatInput';
 import toast from 'react-hot-toast';
-import { getChatCompletion } from '@/lib/ai/chatCompletion';
+import { getChatCompletionWithFailover } from '@/lib/ai/chatCompletion';
+import { AI_MAX_HISTORY_CHARS, AI_MAX_HISTORY_MESSAGES } from '@/lib/ai/constants';
 import { formatRelativeAr } from '@/lib/formatRelativeAr';
 import { formatBytes } from '@/lib/formatBytes';
 
-const SYSTEM_PROMPT = `أنت Cypher، مساعد دراسي ذكي لمعهد الشموخ. تتحدث باللغة العربية دائماً.
-مهمتك مساعدة الطلاب في الفهم والشرح وتلخيص المواد الدراسية.
-عند الإجابة على أي سؤال أو شرح أي موضوع، أضف في نهاية ردك قسماً بعنوان "🎬 مقاطع يوتيوب مقترحة:" وفيه 2-3 روابط يوتيوب حقيقية ومفيدة ذات صلة بالموضوع بالصيغة التالية:
-[عنوان المقطع](https://www.youtube.com/watch?v=XXXX)
-إذا أرسل الطالب صورة أو ملف، قم بتحليله وشرح محتواه بالتفصيل.`;
+const SYSTEM_PROMPT = `Cypher — مساعد معهد الشموخ (أحمد قريز). عربي، مهذب، إجابات مختصرة.
+ساعد بالشرح والتلخيص؛ استخدم قائمة الشيتات أدناه إن وُجدت.
+أنهِ الرد بقسم "🎬 مقاطع يوتيوب مقترحة:" ورابطين فقط بصيغة [عنوان](https://youtube.com/...).
+صورة/ملف: شرح مختصر. لا تخترع شيتاً خارج القائمة.`;
 
 type DbMessage = {
   id: string;
@@ -32,12 +32,28 @@ type SheetRow = {
 };
 
 function buildSheetBlock(sheets: SheetRow[]): string {
-  if (!sheets?.length) return '';
-  const lines = sheets.map(
+  const top = sheets.slice(0, 5);
+  if (!top.length) return '';
+  const lines = top.map(
     (s, i) =>
-      `${i + 1}. ${s.file_name || 'ملف'} (معرّف الشيت: ${s.id})${s.caption ? ` — ${s.caption}` : ''}`
+      `${i + 1}. ${s.file_name || 'ملف'} (${s.id})${s.caption ? ` — ${s.caption.slice(0, 120)}` : ''}`
   );
-  return `\n\nالشيتات المطابقة في قاعدة البيانات (مزامنة من قناة تلغرام):\n${lines.join('\n')}\nعند الإفادة بشيت معيّن، اذكر اسمه بوضوح. قد تظهر للطالب بطاقة تحميل مباشرة تحت ردك عند توفر ملف مطابق.`;
+  return `\nشيتات مطابقة:\n${lines.join('\n')}`;
+}
+
+function clipHistoryForApi(
+  history: Array<{ role: 'user' | 'assistant'; content: unknown }>
+): Array<{ role: 'user' | 'assistant'; content: unknown }> {
+  const tail = history.slice(-AI_MAX_HISTORY_MESSAGES);
+  return tail.map((h) => {
+    if (typeof h.content === 'string' && h.content.length > AI_MAX_HISTORY_CHARS) {
+      return {
+        ...h,
+        content: `${h.content.slice(0, AI_MAX_HISTORY_CHARS)}\n…`,
+      };
+    }
+    return h;
+  });
 }
 
 function sheetToFileCard(row: SheetRow): FileCard {
@@ -290,7 +306,7 @@ export default function ChatLayout() {
         const sr = await fetch(`/api/sheets/search?q=${encodeURIComponent(q)}`);
         if (sr.ok) {
           const sj = await sr.json();
-          sheets = (sj.sheets || []) as SheetRow[];
+          sheets = ((sj.sheets || []) as SheetRow[]).slice(0, 5);
         }
       }
 
@@ -298,20 +314,20 @@ export default function ChatLayout() {
       setChatHistory(newHistory);
 
       const sheetBlock = buildSheetBlock(sheets);
+      const apiTail = clipHistoryForApi(newHistory);
       const apiMessages = [
         { role: 'system' as const, content: SYSTEM_PROMPT + sheetBlock },
-        ...newHistory.map((h) => ({
+        ...apiTail.map((h) => ({
           role: h.role === 'assistant' ? ('assistant' as const) : ('user' as const),
           content: h.content,
         })),
       ];
 
-      const result = await getChatCompletion(
-        'GEMINI',
-        'gemini/gemini-2.5-flash',
-        apiMessages as object[],
-        { temperature: 0.7, max_tokens: 2048 }
-      );
+      const result = await getChatCompletionWithFailover(apiMessages as object[], {
+        temperature: 0.45,
+        max_tokens: 768,
+        timeout: 10,
+      });
 
       const responseText = (result as { choices?: Array<{ message?: { content?: string } }> })?.choices?.[0]
         ?.message?.content as string;
@@ -384,7 +400,7 @@ export default function ChatLayout() {
       <div
         className={`
           fixed lg:relative z-40 h-full
-          transition-transform duration-300 ease-in-out
+          transition-transform duration-200 ease-out
           ${sidebarOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'}
           w-72 lg:w-72 flex-shrink-0
         `}

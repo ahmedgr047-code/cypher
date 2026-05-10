@@ -17,6 +17,16 @@ export async function getChatCompletion(
   });
 }
 
+/** يجرّب سلسلة النماذج على الخادم (Gemini → Groq → …) عند نفاد الحصة أو ضغط الطلبات. */
+export async function getChatCompletionWithFailover(messages: object[], parameters: object = {}) {
+  return callAIEndpoint(ENDPOINT, {
+    failover: true,
+    messages,
+    stream: false,
+    parameters,
+  });
+}
+
 export async function getStreamingChatCompletion(
   provider: string,
   model: string,
