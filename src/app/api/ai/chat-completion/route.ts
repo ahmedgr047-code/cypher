@@ -1,285 +1,206 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { completion } from '@rocketnew/llm-sdk';
-import {
-  getAiFailoverChain,
-  getApiKeysForProvider,
-  shouldFailOverToNextModel,
-  filterModelsWithValidKeys,
-} from '@/lib/ai/modelChain';
 
-/** يجب أن يبقى رقماً ثابتاً — يطابق 15 ث في `lib/ai/constants.ts` (15000 ms). */
-export const maxDuration = 15;
+// Edge runtime for long AI inferences without timeouts
+export const runtime = 'edge';
+export const maxDuration = 60;
 
-function formatErrorResponse(error: unknown, provider?: string) {
-  const statusCode = (error as any)?.statusCode || (error as any)?.status || 500;
-  const providerName = (error as any)?.llmProvider || provider || 'Unknown';
+// Provider configuration
+const PROVIDERS = [
+  {
+    name: 'Gemini_Pro_1',
+    provider: 'GEMINI',
+    model: 'gemini-2.0-flash',
+    keyEnv: 'GEMINI_API_KEY_1',
+    keyPrefix: 'AIza',
+  },
+  {
+    name: 'Gemini_Pro_2',
+    provider: 'GEMINI',
+    model: 'gemini-1.5-flash',
+    keyEnv: 'GEMINI_API_KEY_2',
+    keyPrefix: 'AIza',
+  },
+  {
+    name: 'Groq_Llama_1',
+    provider: 'GROQ',
+    model: 'groq/llama-3.1-8b-instant',
+    keyEnv: 'GROQ_API_KEY_1',
+    keyPrefix: 'gsk_',
+  },
+  {
+    name: 'Groq_Llama_2',
+    provider: 'GROQ',
+    model: 'groq/llama-3.3-70b-versatile',
+    keyEnv: 'GROQ_API_KEY_2',
+    keyPrefix: 'gsk_',
+  },
+];
 
-  return {
-    error: `${providerName.toUpperCase()} API error: ${statusCode}`,
-    details: error instanceof Error ? error.message : String(error),
-    statusCode,
-  };
+// Check if error is recoverable (can try next provider)
+function isRecoverableError(error: unknown): boolean {
+  const statusCode = (error as any)?.statusCode || (error as any)?.status || 0;
+  const message = String(error).toLowerCase();
+  
+  // 429 (Rate Limit), 500, 502, 503, 504 are recoverable
+  if ([429, 500, 502, 503, 504].includes(statusCode)) return true;
+  
+  // Network/timeout errors are recoverable
+  if (message.includes('timeout') || 
+      message.includes('econnreset') ||
+      message.includes('socket') ||
+      message.includes('fetch failed') ||
+      message.includes('network') ||
+      message.includes('abort') ||
+      message.includes('http/2') ||
+      message.includes('connection')) return true;
+      
+  return false;
 }
 
-/** رمز خطأ مزوّد الذكاء الاصطناعي (مثل 404 لموديل محذوف) لا يُعرَض كـ 404 لمسار Next — يُربك المتصفح */
-function httpStatusForUpstreamFailure(upstreamCode: number): number {
-  if (upstreamCode === 404 || upstreamCode === 410) return 502;
-  if (upstreamCode < 400 || upstreamCode >= 600) return 502;
-  return upstreamCode;
+// Log provider failure
+function logProviderError(providerName: string, error: unknown, keyPresent: boolean) {
+  const statusCode = (error as any)?.statusCode || (error as any)?.status || 'unknown';
+  const errorMessage = error instanceof Error ? error.message : String(error);
+  
+  console.error(`[AI Route] ❌ Provider ${providerName} FAILED`);
+  console.error(`[AI Route]    Status Code: ${statusCode}`);
+  console.error(`[AI Route]    Error: ${errorMessage.substring(0, 200)}`);
+  console.error(`[AI Route]    API Key Present: ${keyPresent}`);
+  console.error(`[AI Route]    Recoverable: ${isRecoverableError(error)}`);
 }
 
 export async function POST(request: NextRequest) {
-  const requestId = `chat-${Date.now()}`;
-  let body: any = {};
-
-  console.log(`[${requestId}] Received chat completion request`);
+  const requestId = `req-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  
+  console.log(`[AI Route] [${requestId}] New request received`);
 
   try {
-    body = await request.json();
-    const { provider, model, messages, stream = false, parameters = {}, failover } = body;
-    
-    console.log(`[${requestId}] Request details:`, {
-      provider: provider || 'auto',
-      model: model || 'auto',
-      failover: failover === true || !provider || !model,
-      messagesCount: messages?.length || 0,
-      stream,
-    });
+    const body = await request.json();
+    const { messages, stream = false, parameters = {} } = body;
 
-    // تفعيل failover تلقائياً إذا لم يُحدد provider (لتجنب أخطاء GEMINI)
-    const useFailover = failover === true || !provider || !model;
-
-    if (!messages?.length) {
+    if (!messages?.length || !Array.isArray(messages)) {
+      console.error(`[AI Route] [${requestId}] Invalid request: missing messages`);
       return NextResponse.json(
-        { error: 'Missing required field: messages', details: 'Request validation failed' },
+        { error: 'Invalid request', details: 'messages array is required' },
         { status: 400 }
       );
     }
 
-    if (useFailover) {
-      console.log('[AI Failover] Starting failover process...');
-      
-      // تحقق مفصل من المتغيرات البيئية
-      console.log('[AI Failover] Raw environment check:');
-      console.log('  - GROQ_API_KEY_1:', process.env.GROQ_API_KEY_1 ? `✓ Set (${process.env.GROQ_API_KEY_1.slice(0, 8)}...)` : '✗ Missing');
-      console.log('  - GROQ_API_KEY_2:', process.env.GROQ_API_KEY_2 ? `✓ Set (${process.env.GROQ_API_KEY_2.slice(0, 8)}...)` : '✗ Missing');
-      console.log('  - GEMINI_API_KEY_1:', process.env.GEMINI_API_KEY_1 ? `✓ Set (${process.env.GEMINI_API_KEY_1.slice(0, 8)}...)` : '✗ Missing');
-      console.log('  - GEMINI_API_KEY_2:', process.env.GEMINI_API_KEY_2 ? `✓ Set (${process.env.GEMINI_API_KEY_2.slice(0, 8)}...)` : '✗ Missing');
-      
-      // فحص مباشر: هل المفاتيح موجودة؟
-      const hasGroqKey1 = !!process.env.GROQ_API_KEY_1 && process.env.GROQ_API_KEY_1.startsWith('gsk_');
-      const hasGroqKey2 = !!process.env.GROQ_API_KEY_2 && process.env.GROQ_API_KEY_2.startsWith('gsk_');
-      const hasGeminiKey1 = !!process.env.GEMINI_API_KEY_1 && process.env.GEMINI_API_KEY_1.startsWith('AIza');
-      const hasGeminiKey2 = !!process.env.GEMINI_API_KEY_2 && process.env.GEMINI_API_KEY_2.startsWith('AIza');
-      
-      console.log('[AI Failover] Key validation:');
-      console.log(`  - GROQ_KEY_1 valid: ${hasGroqKey1}`);
-      console.log(`  - GROQ_KEY_2 valid: ${hasGroqKey2}`);
-      console.log(`  - GEMINI_KEY_1 valid: ${hasGeminiKey1}`);
-      console.log(`  - GEMINI_KEY_2 valid: ${hasGeminiKey2}`);
-      
-      if (!hasGroqKey1 && !hasGroqKey2 && !hasGeminiKey1 && !hasGeminiKey2) {
-        console.error('[AI Failover] CRITICAL: No valid API keys found!');
-        return NextResponse.json(
-          { 
-            error: 'No AI providers configured',
-            details: 'Missing or invalid API keys. Please check GROQ_API_KEY_1/2 (should start with gsk_) and GEMINI_API_KEY_1/2 (should start with AIza) in Vercel Environment Variables.'
-          },
-          { status: 503 }
-        );
-      }
-      
-      if (stream) {
-        return NextResponse.json(
-          {
-            error: 'Streaming with failover is not supported',
-            details: 'Use stream: false when failover is enabled',
-          },
-          { status: 400 }
-        );
-      }
+    console.log(`[AI Route] [${requestId}] Processing ${messages.length} messages, stream=${stream}`);
 
-      // الحصول على قائمة الموديلات وفلترة تلك التي لها API Keys صالحة
-      const allChain = getAiFailoverChain();
-      console.log('[AI Failover] All configured models:', allChain.map(c => `${c.provider}/${c.model}`).join(', '));
-      
-      const chain = filterModelsWithValidKeys(allChain);
-      console.log('[AI Failover] Models with valid keys:', chain.map(c => `${c.provider}/${c.model}`).join(', '));
-      console.log('[AI Failover] Valid keys count:', chain.length);
-      
-      if (!chain.length) {
-        console.error('[AI API] No models have valid API keys');
-        console.error('[AI API] Please verify these environment variables are set in Vercel:');
-        console.error('  - GROQ_API_KEY_1');
-        console.error('  - GROQ_API_KEY_2');
-        console.error('  - GEMINI_API_KEY_1');
-        console.error('  - GEMINI_API_KEY_2');
-        return NextResponse.json(
-          { 
-            error: 'No AI providers configured',
-            details: 'Missing API keys. Please check GROQ_API_KEY_1/2 and GEMINI_API_KEY_1/2 in Vercel Environment Variables.'
-          },
-          { status: 503 }
-        );
-      }
+    // Check all API keys availability
+    const availableProviders = PROVIDERS.map(p => {
+      const key = process.env[p.keyEnv];
+      const isValid = !!key && key.startsWith(p.keyPrefix);
+      console.log(`[AI Route] [${requestId}] ${p.name}: ${isValid ? '✓ Available' : '✗ Missing/Invalid'} (${p.keyEnv})`);
+      return { ...p, apiKey: key, isValid };
+    }).filter(p => p.isValid);
 
-      const allErrors: { provider: string; model: string; keyIndex: number; error: string }[] = [];
-
-      // تجربة كل موديل في القائمة
-      for (const entry of chain) {
-        const keys = getApiKeysForProvider(entry.provider);
-        
-        for (let keyIndex = 0; keyIndex < keys.length; keyIndex++) {
-          const apiKey = keys[keyIndex];
-          
-          try {
-            console.log(`[AI Failover] Trying ${entry.provider} / ${entry.model} (key ${keyIndex + 1})...`);
-            
-            const response = await completion({
-              model: entry.model,
-              messages,
-              stream: false,
-              api_key: apiKey,
-              ...parameters,
-            });
-
-            console.log(`[AI Failover] ✅ SUCCESS with ${entry.provider} / ${entry.model} (key ${keyIndex + 1})`);
-            console.log(`[AI Failover] Response preview:`, response?.choices?.[0]?.message?.content?.substring(0, 100) || 'No content');
-            
-            return NextResponse.json(response, {
-              headers: {
-                'X-Cypher-AI-Provider': entry.provider,
-                'X-Cypher-AI-Model': entry.model,
-                'X-Cypher-AI-Key-Slot': String(keyIndex + 1),
-                'X-Cypher-Failover-Attempts': String(allErrors.length),
-              },
-            });
-            
-          } catch (error) {
-            const errMsg = error instanceof Error ? error.message : String(error);
-            const errStatus = (error as any)?.statusCode || (error as any)?.status || 500;
-            const errStack = error instanceof Error ? error.stack : '';
-            const errCode = (error as any)?.code || 'unknown';
-            
-            console.error(`[AI Failover] ❌ FAILED: ${entry.provider} / ${entry.model} (key ${keyIndex + 1})`);
-            console.error(`[AI Failover]    Status: ${errStatus}`);
-            console.error(`[AI Failover]    Code: ${errCode}`);
-            console.error(`[AI Failover]    Error: ${errMsg}`);
-            console.error(`[AI Failover]    Stack: ${errStack?.substring(0, 500)}`);
-            console.error(`[AI Failover]    API Key present: ${apiKey ? 'YES' : 'NO'}`);
-            console.error(`[AI Failover]    API Key length: ${apiKey?.length || 0}`);
-            console.error(`[AI Failover]    API Key prefix: ${apiKey?.slice(0, 10)}...`);
-            
-            allErrors.push({
-              provider: entry.provider,
-              model: entry.model,
-              keyIndex: keyIndex + 1,
-              error: errMsg,
-            });
-
-            // إذا كان الخطأ لا يستدعي التبديل، نتوقف مباشرة
-            const shouldFailover = shouldFailOverToNextModel(error);
-            console.error(`[AI Failover]    Should failover: ${shouldFailover}`);
-            
-            if (!shouldFailover) {
-              console.error(`[AI Failover] 🛑 Non-recoverable error from ${entry.provider}, stopping.`);
-              break;
-            }
-            
-            console.log(`[AI Failover] 🔄 Moving to next model...`);
-            // خلاف ذلك، نكمل للموديل التالي
-          }
-        }
-      }
-
-      // جميع الموديلات فشلت
-      console.error('[AI Failover] All models exhausted. Errors:', allErrors);
-      
-      const lastError = allErrors[allErrors.length - 1];
+    if (availableProviders.length === 0) {
+      console.error(`[AI Route] [${requestId}] CRITICAL: No API keys configured`);
       return NextResponse.json(
         { 
-          error: 'All AI providers failed',
-          details: `Tried ${allErrors.length} attempts. Last error from ${lastError?.provider}: ${lastError?.error}`,
-          attempts: allErrors,
+          error: 'Service unavailable', 
+          details: 'AI providers not configured. Check environment variables.' 
         },
-        { status: 502 }
+        { status: 503 }
       );
     }
 
-    if (!provider || !model) {
-      return NextResponse.json(
-        { error: 'Missing required fields: provider, model (or set failover: true)', details: 'Request validation failed' },
-        { status: 400 }
-      );
-    }
+    console.log(`[AI Route] [${requestId}] ${availableProviders.length} providers available`);
 
-    const providerKeys = getApiKeysForProvider(provider);
-    const apiKey = providerKeys[0];
-    if (!apiKey) {
-      return NextResponse.json(
-        {
-          error: `${provider.toUpperCase()} API key is not configured`,
-          details:
-            'For GEMINI use GEMINI_API_KEY_1 / GEMINI_API_KEY_2; for GROQ use GROQ_API_KEY_1 / GROQ_API_KEY_2 (see Vercel Environment Variables)',
-        },
-        { status: 400 }
-      );
-    }
+    // Try each provider in sequence
+    const errors: { provider: string; status: number | string; error: string }[] = [];
 
-    if (stream) {
-      const response = await completion({
-        model,
-        messages,
-        stream: true,
-        api_key: apiKey,
-        ...parameters,
-      });
+    for (const provider of availableProviders) {
+      console.log(`[AI Route] [${requestId}] Trying ${provider.name} (${provider.provider}/${provider.model})...`);
+      
+      try {
+        const response = await completion({
+          model: provider.model,
+          messages,
+          stream: false,
+          api_key: provider.apiKey!,
+          ...parameters,
+        });
 
-      const encoder = new TextEncoder();
-      const readable = new ReadableStream({
-        async start(controller) {
-          try {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'start' })}\n\n`));
+        // Validate response structure
+        if (!response || typeof response !== 'object') {
+          throw new Error('Invalid response structure from provider');
+        }
 
-            for await (const chunk of response as unknown as AsyncIterable<unknown>) {
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'chunk', chunk })}\n\n`));
-            }
-
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`));
-            controller.close();
-          } catch (error) {
-            const formatted = formatErrorResponse(error, provider);
-            console.error('API Route Error:', { error: formatted.error, details: formatted.details });
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'error', error: formatted.error, details: formatted.details })}\n\n`));
-            controller.close();
+        console.log(`[AI Route] [${requestId}] ✅ SUCCESS with ${provider.name}`);
+        
+        // Return successful response with metadata
+        return NextResponse.json({
+          ...response,
+          _meta: {
+            provider: provider.name,
+            model: provider.model,
+            requestId,
+            fallbackUsed: errors.length > 0,
+            previousErrors: errors.length > 0 ? errors : undefined,
           }
-        },
-      });
+        }, {
+          headers: {
+            'X-Cypher-Provider': provider.name,
+            'X-Cypher-Model': provider.model,
+            'X-Cypher-Request-Id': requestId,
+          },
+        });
 
-      return new NextResponse(readable, {
-        headers: {
-          'Content-Type': 'text/event-stream',
-          'Cache-Control': 'no-cache',
-          Connection: 'keep-alive',
-        },
-      });
+      } catch (error) {
+        logProviderError(provider.name, error, true);
+        
+        const statusCode = (error as any)?.statusCode || (error as any)?.status || 'unknown';
+        errors.push({
+          provider: provider.name,
+          status: statusCode,
+          error: error instanceof Error ? error.message : String(error),
+        });
+
+        // If error is NOT recoverable (like 401 auth error), stop immediately
+        if (!isRecoverableError(error)) {
+          console.error(`[AI Route] [${requestId}] 🛑 Non-recoverable error from ${provider.name}, aborting.`);
+          break;
+        }
+
+        // Continue to next provider if recoverable
+        console.log(`[AI Route] [${requestId}] 🔄 Falling back to next provider...`);
+      }
     }
 
-    const response = await completion({
-      model,
-      messages,
-      stream: false,
-      api_key: apiKey,
-      ...parameters,
-    });
+    // All providers exhausted
+    console.error(`[AI Route] [${requestId}] ❌ All ${availableProviders.length} providers failed`);
+    console.error(`[AI Route] [${requestId}] Error summary:`, errors);
 
-    return NextResponse.json(response);
-  } catch (error) {
-    const formatted = formatErrorResponse(error, body?.provider);
-    console.error('API Route Error:', { error: formatted.error, details: formatted.details });
     return NextResponse.json(
-      { error: formatted.error, details: formatted.details },
-      { status: httpStatusForUpstreamFailure(formatted.statusCode) }
+      { 
+        error: 'All systems busy, please try again in a moment',
+        details: 'All AI providers are currently unavailable',
+        requestId,
+        providerErrors: errors,
+      },
+      { 
+        status: 503,
+        headers: {
+          'X-Cypher-Request-Id': requestId,
+          'Retry-After': '30',
+        },
+      }
+    );
+
+  } catch (error) {
+    console.error(`[AI Route] [${requestId}] FATAL ERROR:`, error);
+    
+    return NextResponse.json(
+      { 
+        error: 'Internal server error',
+        details: error instanceof Error ? error.message : 'Unknown error',
+        requestId,
+      },
+      { status: 500 }
     );
   }
 }
