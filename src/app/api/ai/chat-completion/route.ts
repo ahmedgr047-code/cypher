@@ -18,7 +18,7 @@ const PROVIDERS = [
   {
     name: 'Gemini_Pro_2',
     provider: 'GEMINI',
-    model: 'gemini-1.5-flash',
+    model: 'gemini-2.0-flash-lite',
     keyEnv: 'GEMINI_API_KEY_2',
     keyPrefix: 'AIza',
   },
