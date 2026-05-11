@@ -191,8 +191,16 @@ function MessageBubble({ message }: MessageBubbleProps) {
           </div>
         )}
 
-        {/* File card */}
-        {message.fileCard && <FileDeliveryCard fileCard={message.fileCard} />}
+        {/* File cards - support multiple sheets */}
+        {message.fileCards && message.fileCards.length > 0 ? (
+          <div className="space-y-3">
+            {message.fileCards.map((card, index) => (
+              <FileDeliveryCard key={card.sheetId || index} fileCard={card} index={index} total={message.fileCards!.length} />
+            ))}
+          </div>
+        ) : message.fileCard ? (
+          <FileDeliveryCard fileCard={message.fileCard} />
+        ) : null}
 
         {/* Timestamp */}
         <span className="text-xs text-muted-foreground opacity-60 font-mono-data">
@@ -212,11 +220,12 @@ function MessageBubble({ message }: MessageBubbleProps) {
 
 export default memo(MessageBubble);
 
-function FileDeliveryCard({ fileCard }: { fileCard: NonNullable<Message['fileCard']> }) {
+function FileDeliveryCard({ fileCard, index, total }: { fileCard: NonNullable<Message['fileCard']>; index?: number; total?: number }) {
   const [downloading, setDownloading] = useState(false);
   const [downloaded, setDownloaded] = useState(false);
 
   const isExternal = fileCard.source === 'external';
+  const showCounter = total && total > 1;
 
   const handleDownload = async () => {
     setDownloading(true);
@@ -273,8 +282,13 @@ function FileDeliveryCard({ fileCard }: { fileCard: NonNullable<Message['fileCar
   return (
     <div className="file-card p-4 w-full min-w-[260px] max-w-[340px]">
       <div className="flex items-start gap-3 mb-3">
-        <div className="w-10 h-10 rounded-xl bg-primary bg-opacity-10 border border-primary border-opacity-20 flex items-center justify-center flex-shrink-0">
+        <div className="relative w-10 h-10 rounded-xl bg-primary bg-opacity-10 border border-primary border-opacity-20 flex items-center justify-center flex-shrink-0">
           <FileText size={18} className="text-primary" />
+          {showCounter && (
+            <span className="absolute -top-1 -right-1 w-5 h-5 bg-primary text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-sm">
+              {(index || 0) + 1}/{total}
+            </span>
+          )}
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-foreground leading-tight mb-1 truncate">{fileCard.fileName}</p>

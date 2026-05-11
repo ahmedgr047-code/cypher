@@ -15,7 +15,8 @@ export interface Message {
   role: 'user' | 'bot';
   content: string;
   timestamp: string;
-  fileCard?: FileCard;
+  fileCard?: FileCard; // للتوافق مع القديم
+  fileCards?: FileCard[]; // دعم عدة شيتات
   attachmentPreview?: string;
   attachmentName?: string;
 }

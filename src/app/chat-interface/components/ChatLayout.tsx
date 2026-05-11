@@ -134,6 +134,7 @@ function dbMsgToUi(m: DbMessage): Message {
     content: m.content,
     timestamp: ts,
     fileCard: extra.fileCard as FileCard | undefined,
+    fileCards: extra.fileCards as FileCard[] | undefined,
   };
 }
 
@@ -395,7 +396,9 @@ export default function ChatLayout() {
         reply = `✅ وجدت ${sheets.length === 1 ? 'شيت' : sheets.length + ' شيتات'} مطابقة في الأرشيف: ${sheetNames}\n\n${reply}`;
       }
 
-      const fileCard = sheets.length > 0 ? sheetToFileCard(sheets[0]) : undefined;
+      // إنشاء بطاقات لجميع الشيتات المطابقة (حتى 5)
+      const fileCards = sheets.length > 0 ? sheets.map(sheetToFileCard) : undefined;
+      const fileCard = fileCards?.[0]; // للتوافق مع القديم
 
       const saveBot = await fetch(`/api/conversations/${activeConvId}/messages`, {
         method: 'POST',
@@ -403,7 +406,7 @@ export default function ChatLayout() {
         body: JSON.stringify({
           role: 'assistant',
           content: reply,
-          extra: fileCard ? { fileCard } : {},
+          extra: fileCards ? { fileCards, fileCard: fileCards[0] } : {},
         }),
       });
       if (!saveBot.ok) throw new Error('save bot');
@@ -420,6 +423,7 @@ export default function ChatLayout() {
           minute: '2-digit',
         }),
         fileCard,
+        fileCards,
       };
       setMessages((prev) => [...prev, botMsg]);
       setChatHistory((prev) => [...prev, { role: 'assistant', content: reply }]);
