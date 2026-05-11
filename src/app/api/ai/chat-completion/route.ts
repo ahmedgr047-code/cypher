@@ -81,6 +81,8 @@ async function callGemini(apiKey: string, model: string, messages: any[]) {
   const genAI = new GoogleGenerativeAI(apiKey);
   const genModel = genAI.getGenerativeModel({ model });
   
+  console.log(`[Gemini] Original messages:`, messages.map(m => m.role).join(', '));
+  
   // Format messages for Gemini API
   // 1. Map roles: 'assistant' -> 'model', keep 'user' as is
   // 2. Ensure no consecutive duplicate roles
@@ -89,6 +91,8 @@ async function callGemini(apiKey: string, model: string, messages: any[]) {
     role: m.role === 'user' ? 'user' : 'model',
     parts: [{ text: m.content }],
   }));
+  
+  console.log(`[Gemini] After role mapping:`, formattedMessages.map(m => m.role).join(', '));
   
   // Remove consecutive duplicates and ensure starts with user
   const sanitizedMessages = [];
@@ -101,21 +105,35 @@ async function callGemini(apiKey: string, model: string, messages: any[]) {
     lastRole = msg.role;
   }
   
-  // Ensure first message is from user
-  if (sanitizedMessages.length > 0 && sanitizedMessages[0].role !== 'user') {
-    // Remove messages until we find the first user message
-    const firstUserIndex = sanitizedMessages.findIndex(m => m.role === 'user');
-    if (firstUserIndex !== -1) {
-      sanitizedMessages.splice(0, firstUserIndex);
-    } else {
-      // No user message found - this shouldn't happen but handle gracefully
-      throw new Error('No user message found in conversation');
-    }
+  console.log(`[Gemini] After removing duplicates:`, sanitizedMessages.map(m => m.role).join(', '));
+  
+  // Ensure first message is from user - remove any leading 'model' messages
+  while (sanitizedMessages.length > 0 && sanitizedMessages[0].role === 'model') {
+    console.log(`[Gemini] Removing leading 'model' message`);
+    sanitizedMessages.shift();
   }
+  
+  if (sanitizedMessages.length === 0) {
+    throw new Error('No valid messages found after sanitization');
+  }
+  
+  if (sanitizedMessages[0].role !== 'user') {
+    throw new Error(`First message role is '${sanitizedMessages[0].role}', expected 'user'`);
+  }
+  
+  console.log(`[Gemini] Final sanitized:`, sanitizedMessages.map(m => m.role).join(', '));
   
   // Split into history (all except last) and current message
   const history = sanitizedMessages.slice(0, -1);
   const lastMessage = sanitizedMessages[sanitizedMessages.length - 1];
+  
+  console.log(`[Gemini] History roles:`, history.map(m => m.role).join(', '));
+  console.log(`[Gemini] Last message role:`, lastMessage.role);
+  
+  // Validate history doesn't start with model
+  if (history.length > 0 && history[0].role === 'model') {
+    throw new Error('History starts with model role - this should not happen');
+  }
   
   // Start chat with history
   const chat = genModel.startChat({
