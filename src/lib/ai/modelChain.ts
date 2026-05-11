@@ -8,11 +8,11 @@ export type AiFailoverEntry = {
 };
 
 /**
- * افتراضياً: Gemini 2.5 Flash (متوافق مع واجهة Google الحالية؛ 1.5 أزيل/لا يُعاد).
- * ثم Groq 8B، ثم OpenAI. يُستبدَل عبر `AI_MODEL_CHAIN_JSON`.
+ * ⚡ GROQ أولاً (الأسرع والأكثر استقراراً)
+ * ثم OpenAI كاحتياط
+ * ملاحظة: GEMINI معطل مؤقتاً بسبب مشاكل في الـ API
  */
 export const DEFAULT_AI_FAILOVER_CHAIN: AiFailoverEntry[] = [
-  { provider: 'GEMINI', model: 'gemini/gemini-2.5-flash' },
   { provider: 'GROQ', model: 'groq/llama-3.1-8b-instant' },
   { provider: 'OPEN_AI', model: 'gpt-4o-mini' },
 ];
@@ -23,6 +23,17 @@ function parseEnvChain(): AiFailoverEntry[] | null {
   try {
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed) || parsed.length < 1) return null;
+    
+    // ⚡ حماية: إذا كان الإعداد يحتوي على GEMINI أو grop (خطأ شائع)، نتجاهله
+    const hasGemini = parsed.some((item: any) => 
+      item?.provider?.toUpperCase() === 'GEMINI' || 
+      item?.model?.toLowerCase().includes('grop')
+    );
+    if (hasGemini) {
+      console.warn('AI_MODEL_CHAIN_JSON contains GEMINI or invalid model, using default GROQ chain');
+      return null;
+    }
+    
     const out: AiFailoverEntry[] = [];
     for (const item of parsed) {
       if (
