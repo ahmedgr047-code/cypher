@@ -43,7 +43,7 @@ export async function GET(request: Request) {
   // البحث 1: بالنص الكامل في file_name
   const r1 = await supabase
     .from('sheet_archive')
-    .select('id,file_name,caption,file_size,mime_type,created_at')
+    .select('id,file_name,caption,file_size,mime_type,created_at,file_url')
     .ilike('file_name', fullPattern)
     .order('created_at', { ascending: false })
     .limit(10);
@@ -53,7 +53,7 @@ export async function GET(request: Request) {
   // البحث 2: بالنص الكامل في caption
   const r2 = await supabase
     .from('sheet_archive')
-    .select('id,file_name,caption,file_size,mime_type,created_at')
+    .select('id,file_name,caption,file_size,mime_type,created_at,file_url')
     .ilike('caption', fullPattern)
     .order('created_at', { ascending: false })
     .limit(10);
@@ -71,7 +71,7 @@ export async function GET(request: Request) {
       const wordPattern = `%${mainWord}%`;
       const r3 = await supabase
         .from('sheet_archive')
-        .select('id,file_name,caption,file_size,mime_type,created_at')
+        .select('id,file_name,caption,file_size,mime_type,created_at,file_url')
         .or(`file_name.ilike.${wordPattern},caption.ilike.${wordPattern}`)
         .order('created_at', { ascending: false })
         .limit(10);
@@ -84,7 +84,7 @@ export async function GET(request: Request) {
   }
 
   // ندمج النتائج من كل البحوث (byName + byCaption + byWords)
-  type SheetResult = { id: string; file_name: string | null; caption: string | null; file_size: number | null; mime_type: string | null; created_at: string };
+  type SheetResult = { id: string; file_name: string | null; caption: string | null; file_size: number | null; mime_type: string | null; created_at: string; file_url: string | null };
   const map = new Map<string, SheetResult>();
 
   const allResults = [...(byName ?? []), ...(byCaption ?? []), ...(byWords ?? [])];

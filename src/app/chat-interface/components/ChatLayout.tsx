@@ -66,6 +66,7 @@ type SheetRow = {
   file_name: string | null;
   caption: string | null;
   file_size: number | null;
+  file_url: string | null;
 };
 
 function buildSheetBlock(sheets: SheetRow[]): string {
@@ -95,16 +96,19 @@ function clipHistoryForApi(
 }
 
 function sheetToFileCard(row: SheetRow): FileCard {
+  // إذا كان file_url موجود، نستخدمه مباشرة كرابط تحميل
+  // إذا لم يكن موجود، نستخدم API الداخلية
+  const isExternalLink = !!row.file_url;
   return {
     sheetId: row.id,
     fileName: row.file_name || 'شيت',
     subject: row.caption?.slice(0, 80) || 'أرشيف المعهد',
-    subjectCode: 'أرشيف',
+    subjectCode: isExternalLink ? 'رابط خارجي' : 'أرشيف',
     semester: '—',
-    fileSize: formatBytes(row.file_size),
+    fileSize: isExternalLink ? 'رابط مباشر' : formatBytes(row.file_size),
     pages: 0,
-    downloadUrl: `/api/sheets/${row.id}/download`,
-    source: 'archive',
+    downloadUrl: row.file_url || `/api/sheets/${row.id}/download`,
+    source: isExternalLink ? 'external' : 'archive',
   };
 }
 

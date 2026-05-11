@@ -17,11 +17,22 @@ export async function GET(
 
   const { data: row, error } = await supabase
     .from('sheet_archive')
-    .select('storage_object_path,file_name,mime_type')
+    .select('storage_object_path,file_name,mime_type,file_url')
     .eq('id', id)
     .single();
 
-  if (error || !row?.storage_object_path) {
+  if (error) {
+    return new NextResponse('غير موجود', { status: 404 });
+  }
+
+  // إذا كان file_url موجود، هذا رابط خارجي (Google Drive مثلاً)
+  if (row?.file_url) {
+    // نعيد توجيه المستخدم للرابط مباشرة
+    return NextResponse.redirect(row.file_url, { status: 302 });
+  }
+
+  // إذا لم يكن هناك file_url، نتحقق من storage_object_path
+  if (!row?.storage_object_path) {
     return new NextResponse('غير موجود', { status: 404 });
   }
 

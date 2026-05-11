@@ -7,7 +7,7 @@ export interface FileCard {
   fileSize: string;
   pages: number;
   downloadUrl: string;
-  source: 'archive';
+  source: 'archive' | 'external';
 }
 
 export interface Message {

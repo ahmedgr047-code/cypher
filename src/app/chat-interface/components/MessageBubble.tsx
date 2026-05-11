@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, memo } from 'react';
-import { Download, FileText, Loader2, CheckCircle, ExternalLink } from 'lucide-react';
+import { Download, Play, X, FileText, Loader2, CheckCircle, ExternalLink } from 'lucide-react';
 import type { Message } from '@/types/chat';
 import { toast } from 'sonner';
 
@@ -216,9 +216,40 @@ function FileDeliveryCard({ fileCard }: { fileCard: NonNullable<Message['fileCar
   const [downloading, setDownloading] = useState(false);
   const [downloaded, setDownloaded] = useState(false);
 
+  const isExternal = fileCard.source === 'external';
+
   const handleDownload = async () => {
     setDownloading(true);
     try {
+      // إذا كان رابط خارجي (Google Drive)، نحاول تحميله مباشرة
+      if (isExternal) {
+        // طريقة 1: استخدام iframe مخفي للتحميل المباشر
+        const iframe = document.createElement('iframe');
+        iframe.style.display = 'none';
+        iframe.src = fileCard.downloadUrl;
+        document.body.appendChild(iframe);
+        
+        // طريقة 2: استخدام رابط مؤقت مع تحميل
+        setTimeout(() => {
+          const a = document.createElement('a');
+          a.href = fileCard.downloadUrl;
+          a.download = fileCard.fileName;
+          a.style.display = 'none';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        }, 500);
+
+        setTimeout(() => {
+          document.body.removeChild(iframe);
+        }, 3000);
+
+        setDownloaded(true);
+        toast.success('تم بدء التحميل', { description: fileCard.fileName });
+        return;
+      }
+
+      // إذا كان ملف من الأرشيف الداخلي، نحمله عبر API
       const res = await fetch(fileCard.downloadUrl, { credentials: 'include' });
       if (!res.ok) throw new Error('download failed');
       const blob = await res.blob();
@@ -253,7 +284,9 @@ function FileDeliveryCard({ fileCard }: { fileCard: NonNullable<Message['fileCar
       <div className="flex flex-wrap gap-1.5 mb-3">
         <span className="semester-badge">{fileCard.semester}</span>
         <span className="subject-tag">{fileCard.subjectCode}</span>
-        <span className="sheet-archive-badge">📚 أرشيف</span>
+        <span className={isExternal ? "sheet-external-badge" : "sheet-archive-badge"}>
+          {isExternal ? '🔗 رابط خارجي' : '📚 أرشيف'}
+        </span>
       </div>
       <div className="flex items-center gap-3 text-xs text-muted-foreground mb-3 font-mono-data">
         <span>{fileCard.fileSize}</span>

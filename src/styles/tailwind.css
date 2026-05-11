@@ -315,6 +315,16 @@ html.light .subject-tag {
     font-weight: 600;
   }
 
+  .sheet-external-badge {
+    background: rgba(59, 130, 246, 0.12);
+    border: 1px solid rgba(59, 130, 246, 0.28);
+    color: rgb(59, 130, 246);
+    border-radius: 6px;
+    font-size: 11px;
+    padding: 2px 8px;
+    font-weight: 600;
+  }
+
   .semester-badge {
     background: rgba(232, 25, 44, 0.12);
     border: 1px solid rgba(232, 25, 44, 0.25);
