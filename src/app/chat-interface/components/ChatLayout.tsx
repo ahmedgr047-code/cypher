@@ -438,8 +438,26 @@ export default function ChatLayout() {
         }),
       });
       await refreshConversations();
-    } catch {
-      toast.error('حدث خطأ في الاتصال بـ Cypher. حاول مرة أخرى.');
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'حدث خطأ في الاتصال';
+      console.error('[ChatLayout] AI Error:', errorMsg);
+      
+      // إظهار رسالة خطأ واضحة فقط بعد فشل جميع الموديلات
+      toast.error('حدث خطأ في الاتصال بـ Cypher.', {
+        description: 'جميع موديلات AI فشلت. تحقق من إعدادات API Keys.',
+      });
+      
+      // إزالة رسالة "جاري الكتابة" وإظهار رسالة خطأ للمستخدم
+      setMessages((prev) => prev.filter((m) => m.id !== `typing-${activeConvId}`));
+      
+      const errorMsgBot: Message = {
+        id: `error-${Date.now()}`,
+        role: 'bot',
+        content: '⚠️ عذراً، جميع موديلات AI غير متاحة حالياً. الرجاء التحقق من:\n\n1. إعدادات API Keys في Vercel\n2. توفر خدمة Groq\n3. توفر خدمة Gemini\n\nجرب تحديث الصفحة أو المحاولة لاحقاً.',
+        timestamp: new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' }),
+      };
+      setMessages((prev) => [...prev, errorMsgBot]);
+      
       await loadThread(activeConvId);
     } finally {
       setIsTyping(false);

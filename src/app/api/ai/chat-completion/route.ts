@@ -4,6 +4,7 @@ import {
   getAiFailoverChain,
   getApiKeysForProvider,
   shouldFailOverToNextModel,
+  filterModelsWithValidKeys,
 } from '@/lib/ai/modelChain';
 
 /** يجب أن يبقى رقماً ثابتاً — يطابق 10 ث في `lib/ai/constants.ts` (10000 ms). */
@@ -56,41 +57,11 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const chain = getAiFailoverChain();
-      let lastError: unknown;
-      let attempted = false;
-
-      outer: for (const entry of chain) {
-        const keys = getApiKeysForProvider(entry.provider);
-        if (!keys.length) continue;
-
-        for (let keyIndex = 0; keyIndex < keys.length; keyIndex++) {
-          const apiKey = keys[keyIndex];
-          attempted = true;
-          try {
-            const response = await completion({
-              model: entry.model,
-              messages,
-              stream: false,
-              api_key: apiKey,
-              ...parameters,
-            });
-
-            return NextResponse.json(response, {
-              headers: {
-                'X-Cypher-AI-Provider': entry.provider,
-                'X-Cypher-AI-Model': entry.model,
-                'X-Cypher-AI-Key-Slot': String(keyIndex + 1),
-              },
-            });
-          } catch (error) {
-            lastError = error;
-            if (!shouldFailOverToNextModel(error)) break outer;
-          }
-        }
-      }
-
-      if (!attempted) {
+      // الحصول على قائمة الموديلات وفلترة تلك التي لها API Keys صالحة
+      const allChain = getAiFailoverChain();
+      const chain = filterModelsWithValidKeys(allChain);
+      
+      if (!chain.length) {
         return NextResponse.json(
           {
             error: 'No AI API keys configured for failover',
@@ -101,14 +72,72 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const formatted = formatErrorResponse(lastError, chain[0]?.provider);
-      console.error('API Route Error (failover exhausted):', {
-        error: formatted.error,
-        details: formatted.details,
-      });
+      const allErrors: { provider: string; model: string; keyIndex: number; error: string }[] = [];
+
+      // تجربة كل موديل في القائمة
+      for (const entry of chain) {
+        const keys = getApiKeysForProvider(entry.provider);
+        
+        for (let keyIndex = 0; keyIndex < keys.length; keyIndex++) {
+          const apiKey = keys[keyIndex];
+          
+          try {
+            console.log(`[AI Failover] Trying ${entry.provider} / ${entry.model} (key ${keyIndex + 1})...`);
+            
+            const response = await completion({
+              model: entry.model,
+              messages,
+              stream: false,
+              api_key: apiKey,
+              ...parameters,
+            });
+
+            console.log(`[AI Failover] Success with ${entry.provider} / ${entry.model}`);
+            
+            return NextResponse.json(response, {
+              headers: {
+                'X-Cypher-AI-Provider': entry.provider,
+                'X-Cypher-AI-Model': entry.model,
+                'X-Cypher-AI-Key-Slot': String(keyIndex + 1),
+                'X-Cypher-Failover-Attempts': String(allErrors.length),
+              },
+            });
+            
+          } catch (error) {
+            const errMsg = error instanceof Error ? error.message : String(error);
+            const errStatus = (error as any)?.statusCode || (error as any)?.status || 500;
+            
+            console.warn(`[AI Failover] Failed ${entry.provider} / ${entry.model} (key ${keyIndex + 1}): ${errMsg}`);
+            
+            allErrors.push({
+              provider: entry.provider,
+              model: entry.model,
+              keyIndex: keyIndex + 1,
+              error: errMsg,
+            });
+
+            // إذا كان الخطأ لا يستدعي التبديل، نتوقف مباشرة
+            if (!shouldFailOverToNextModel(error)) {
+              console.error(`[AI Failover] Non-recoverable error from ${entry.provider}, stopping.`);
+              break;
+            }
+            
+            // خلاف ذلك، نكمل للموديل التالي
+          }
+        }
+      }
+
+      // جميع الموديلات فشلت
+      console.error('[AI Failover] All models exhausted. Errors:', allErrors);
+      
+      const lastError = allErrors[allErrors.length - 1];
       return NextResponse.json(
-        { error: formatted.error, details: formatted.details },
-        { status: httpStatusForUpstreamFailure(formatted.statusCode) }
+        { 
+          error: 'All AI providers failed',
+          details: `Tried ${allErrors.length} attempts. Last error from ${lastError?.provider}: ${lastError?.error}`,
+          attempts: allErrors,
+        },
+        { status: 502 }
       );
     }
 

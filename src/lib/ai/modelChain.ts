@@ -100,7 +100,9 @@ export function shouldFailOverToNextModel(error: unknown): boolean {
     (error as { status?: number })?.status ??
     (error as { response?: { status?: number } })?.response?.status;
 
-  if (status === 429 || status === 503 || status === 502 || status === 408) return true;
+  /* أي خطأ 5xx أو 4xx يعني ننتقل للموديل التالي */
+  if (status === 500 || status === 501 || status === 502 || status === 503 || status === 504) return true;
+  if (status === 429 || status === 408) return true;
   if (status === 402 || status === 403) return true;
   /* موديل Google معطّل/غير موجود — ننتقل لـ Groq */
   if (status === 404 || status === 410) return true;
@@ -128,8 +130,24 @@ export function shouldFailOverToNextModel(error: unknown): boolean {
     'notfound',
     'geminiexception',
     'deprecated',
+    'api error',
+    'unable to detect provider',
+    'invalid api key',
+    'authentication failed',
+    'bad request',
   ];
   if (patterns.some((p) => msg.includes(p))) return true;
 
   return false;
+}
+
+/** 
+ * فلترة قائمة الموديلات — نحتفظ فقط بالموديلات التي لها API Key صالح
+ * لتجنب محاولة استخدام موديل بدون مفتاح
+ */
+export function filterModelsWithValidKeys(chain: AiFailoverEntry[]): AiFailoverEntry[] {
+  return chain.filter((entry) => {
+    const keys = getApiKeysForProvider(entry.provider);
+    return keys.length > 0;
+  });
 }
