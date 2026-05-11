@@ -35,7 +35,8 @@ export async function POST(request: NextRequest) {
     body = await request.json();
     const { provider, model, messages, stream = false, parameters = {}, failover } = body;
 
-    const useFailover = failover === true;
+    // تفعيل failover تلقائياً إذا لم يُحدد provider (لتجنب أخطاء GEMINI)
+    const useFailover = failover === true || !provider || !model;
 
     if (!messages?.length) {
       return NextResponse.json(
