@@ -66,6 +66,29 @@ export async function POST(request: NextRequest) {
       console.log('  - GEMINI_API_KEY_1:', process.env.GEMINI_API_KEY_1 ? `✓ Set (${process.env.GEMINI_API_KEY_1.slice(0, 8)}...)` : '✗ Missing');
       console.log('  - GEMINI_API_KEY_2:', process.env.GEMINI_API_KEY_2 ? `✓ Set (${process.env.GEMINI_API_KEY_2.slice(0, 8)}...)` : '✗ Missing');
       
+      // فحص مباشر: هل المفاتيح موجودة؟
+      const hasGroqKey1 = !!process.env.GROQ_API_KEY_1 && process.env.GROQ_API_KEY_1.startsWith('gsk_');
+      const hasGroqKey2 = !!process.env.GROQ_API_KEY_2 && process.env.GROQ_API_KEY_2.startsWith('gsk_');
+      const hasGeminiKey1 = !!process.env.GEMINI_API_KEY_1 && process.env.GEMINI_API_KEY_1.startsWith('AIza');
+      const hasGeminiKey2 = !!process.env.GEMINI_API_KEY_2 && process.env.GEMINI_API_KEY_2.startsWith('AIza');
+      
+      console.log('[AI Failover] Key validation:');
+      console.log(`  - GROQ_KEY_1 valid: ${hasGroqKey1}`);
+      console.log(`  - GROQ_KEY_2 valid: ${hasGroqKey2}`);
+      console.log(`  - GEMINI_KEY_1 valid: ${hasGeminiKey1}`);
+      console.log(`  - GEMINI_KEY_2 valid: ${hasGeminiKey2}`);
+      
+      if (!hasGroqKey1 && !hasGroqKey2 && !hasGeminiKey1 && !hasGeminiKey2) {
+        console.error('[AI Failover] CRITICAL: No valid API keys found!');
+        return NextResponse.json(
+          { 
+            error: 'No AI providers configured',
+            details: 'Missing or invalid API keys. Please check GROQ_API_KEY_1/2 (should start with gsk_) and GEMINI_API_KEY_1/2 (should start with AIza) in Vercel Environment Variables.'
+          },
+          { status: 503 }
+        );
+      }
+      
       if (stream) {
         return NextResponse.json(
           {
