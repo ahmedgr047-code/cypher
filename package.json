@@ -51,7 +51,7 @@
   "dependencies": {
     "@dhiwise/component-tagger": "^1.0.15",
     "@google/generative-ai": "^0.21.0",
-    "@groq-sdk": "^0.15.0",
+    "groq-sdk": "^0.15.0",
     "@heroicons/react": "^2.2.0",
     "@rocketnew/llm-sdk": "1.1.0",
     "@supabase/ssr": "^0.5.2",
