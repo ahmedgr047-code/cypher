@@ -81,16 +81,49 @@ async function callGemini(apiKey: string, model: string, messages: any[]) {
   const genAI = new GoogleGenerativeAI(apiKey);
   const genModel = genAI.getGenerativeModel({ model });
   
-  // Convert messages to Gemini format
+  // Format messages for Gemini API
+  // 1. Map roles: 'assistant' -> 'model', keep 'user' as is
+  // 2. Ensure no consecutive duplicate roles
+  // 3. Ensure first message is from 'user'
+  const formattedMessages = messages.map(m => ({
+    role: m.role === 'user' ? 'user' : 'model',
+    parts: [{ text: m.content }],
+  }));
+  
+  // Remove consecutive duplicates and ensure starts with user
+  const sanitizedMessages = [];
+  let lastRole = null;
+  
+  for (const msg of formattedMessages) {
+    // Skip if same role as last message
+    if (msg.role === lastRole) continue;
+    sanitizedMessages.push(msg);
+    lastRole = msg.role;
+  }
+  
+  // Ensure first message is from user
+  if (sanitizedMessages.length > 0 && sanitizedMessages[0].role !== 'user') {
+    // Remove messages until we find the first user message
+    const firstUserIndex = sanitizedMessages.findIndex(m => m.role === 'user');
+    if (firstUserIndex !== -1) {
+      sanitizedMessages.splice(0, firstUserIndex);
+    } else {
+      // No user message found - this shouldn't happen but handle gracefully
+      throw new Error('No user message found in conversation');
+    }
+  }
+  
+  // Split into history (all except last) and current message
+  const history = sanitizedMessages.slice(0, -1);
+  const lastMessage = sanitizedMessages[sanitizedMessages.length - 1];
+  
+  // Start chat with history
   const chat = genModel.startChat({
-    history: messages.slice(0, -1).map(m => ({
-      role: m.role === 'user' ? 'user' : 'model',
-      parts: [{ text: m.content }],
-    })),
+    history: history,
   });
   
-  const lastMessage = messages[messages.length - 1];
-  const result = await chat.sendMessage(lastMessage.content);
+  // Send the last message
+  const result = await chat.sendMessage(lastMessage.parts[0].text);
   const response = await result.response;
   const text = response.text();
   
