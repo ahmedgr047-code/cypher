@@ -119,6 +119,8 @@ export function shouldFailOverToNextModel(error: unknown): boolean {
     return true;
   }
   
+  // أنماط أخطاء تستدعي failover
+  const patterns = [
     'quota',
     'rate limit',
     'ratelimit',
@@ -146,7 +148,7 @@ export function shouldFailOverToNextModel(error: unknown): boolean {
     'authentication failed',
     'bad request',
   ];
-  if (patterns.some((p) => msg.includes(p))) return true;
+  if (patterns.some((p) => errorMessage.includes(p))) return true;
 
   return false;
 }
