@@ -8,13 +8,14 @@ export type AiFailoverEntry = {
 };
 
 /**
- * ⚡ GROQ أولاً (الأسرع والأكثر استقراراً)
- * ثم OpenAI كاحتياط
- * ملاحظة: GEMINI معطل مؤقتاً بسبب مشاكل في الـ API
+ * سلسلة الموديلات: 2 Gemini + 2 Groq
+ * ترتيب: Gemini أولاً (1) ثم Groq ثم Gemini (2) ثم Groq (2)
  */
 export const DEFAULT_AI_FAILOVER_CHAIN: AiFailoverEntry[] = [
+  { provider: 'GEMINI', model: 'gemini-2.0-flash' },
   { provider: 'GROQ', model: 'groq/llama-3.1-8b-instant' },
-  { provider: 'OPEN_AI', model: 'gpt-4o-mini' },
+  { provider: 'GEMINI', model: 'gemini-1.5-flash' },
+  { provider: 'GROQ', model: 'groq/llama-3.3-70b-versatile' },
 ];
 
 function parseEnvChain(): AiFailoverEntry[] | null {
@@ -24,13 +25,12 @@ function parseEnvChain(): AiFailoverEntry[] | null {
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed) || parsed.length < 1) return null;
     
-    // ⚡ حماية: إذا كان الإعداد يحتوي على GEMINI أو grop (خطأ شائع)، نتجاهله
-    const hasGemini = parsed.some((item: any) => 
-      item?.provider?.toUpperCase() === 'GEMINI' || 
+    // ⚡ حماية: إذا كان الإعداد يحتوي على خطأ إملائي شائع "grop"، نتجاهله
+    const hasInvalid = parsed.some((item: any) => 
       item?.model?.toLowerCase().includes('grop')
     );
-    if (hasGemini) {
-      console.warn('AI_MODEL_CHAIN_JSON contains GEMINI or invalid model, using default GROQ chain');
+    if (hasInvalid) {
+      console.warn('AI_MODEL_CHAIN_JSON contains invalid model "grop", using default chain');
       return null;
     }
     
