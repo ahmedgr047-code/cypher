@@ -1,1 +1,79 @@
 @import './tailwind.css';
+
+/* Custom animations for Cypher */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Enhanced quick chip styles */
+.quick-chip {
+  @apply px-4 py-2 bg-background border border-border rounded-lg text-sm font-medium text-foreground hover:bg-accent hover:text-accent-foreground transition-all duration-200 cursor-pointer;
+  animation: fadeInUp 0.3s ease-out forwards;
+}
+
+/* Typing indicator animation */
+.typing-indicator {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* Message bubble animations */
+.message-bubble {
+  animation: slideIn 0.3s ease-out;
+}
+
+/* Glow effect for logo */
+.glow-red {
+  box-shadow: 0 0 20px rgba(232, 25, 44, 0.3);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+/* Scrollbar styling */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--border)) transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background-color: hsl(var(--border));
+  border-radius: 3px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background-color: hsl(var(--muted-foreground));
+}

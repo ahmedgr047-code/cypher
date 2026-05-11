@@ -95,20 +95,43 @@ export default function ChatMain({
         )}
       </div>
 
-      {/* Quick chips (only shown when not empty, above input) */}
-      {!isEmpty && (
-        <div className="flex-shrink-0 px-4 py-2 border-t border-border">
-          <div className="flex gap-2 overflow-x-auto scrollbar-thin pb-1">
-            {quickChips.slice(0, 4).map((chip) => (
+      {/* Quick Chips */}
+      {isEmpty && quickChips.length > 0 && (
+        <div className="flex-shrink-0 px-4 py-3 border-t border-border">
+          <div className="mb-2">
+            <h3 className="text-sm font-medium text-muted-foreground mb-2">أسئلة مقترحة:</h3>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-2xl mx-auto">
+            {quickChips.slice(0, 6).map((chip, index) => (
               <button
-                key={`chip-${chip}`}
+                key={`chip-${index}`}
                 onClick={() => onSendMessage(chip)}
-                className="quick-chip flex-shrink-0"
+                className="quick-chip text-right hover:scale-105 transition-transform duration-200 shadow-sm hover:shadow-md"
+                style={{
+                  animationDelay: `${index * 50}ms`,
+                  animation: 'fadeInUp 0.3s ease-out forwards',
+                  opacity: 0
+                }}
               >
                 {chip}
               </button>
             ))}
           </div>
+          {quickChips.length > 6 && (
+            <div className="mt-2 text-center">
+              <button
+                onClick={() => {
+                  // Show more chips logic
+                  const remainingChips = quickChips.slice(6);
+                  const randomChip = remainingChips[Math.floor(Math.random() * remainingChips.length)];
+                  onSendMessage(randomChip);
+                }}
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                + المزيد من الاقتراحات
+              </button>
+            </div>
+          )}
         </div>
       )}
 

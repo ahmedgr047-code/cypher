@@ -1,6 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
 import AuthBrandPanel from './AuthBrandPanel';
 import LoginForm from './LoginForm';
 import SignUpForm from './SignUpForm';
@@ -11,6 +13,68 @@ export type AuthTab = 'login' | 'signup';
 export default function AuthContainer() {
   const [activeTab, setActiveTab] = useState<AuthTab>('login');
   const [showForgot, setShowForgot] = useState(false);
+  const router = useRouter();
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fast session check with caching
+  useEffect(() => {
+    const checkSession = async () => {
+      try {
+        // Check if we already have a recent valid session in memory
+        const cachedSession = sessionStorage.getItem('cypher_session_check');
+        if (cachedSession) {
+          const { timestamp, isValid } = JSON.parse(cachedSession);
+          // If cached session is less than 5 minutes old and valid, use it
+          if (Date.now() - timestamp < 300000 && isValid) {
+            router.replace('/chat-interface');
+            return;
+          }
+        }
+
+        // Add timeout to prevent hanging
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Session check timeout')), 1500)
+        );
+        
+        const supabase = await createClient();
+        const sessionPromise = supabase.auth.getSession();
+        
+        const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]) as any;
+        
+        // Cache the result
+        sessionStorage.setItem('cypher_session_check', JSON.stringify({
+          timestamp: Date.now(),
+          isValid: !!session
+        }));
+        
+        if (session) {
+          // Fast redirect without delay
+          router.replace('/chat-interface');
+          return;
+        }
+      } catch (error) {
+        console.error('Session check error:', error);
+        // Clear cache on error
+        sessionStorage.removeItem('cypher_session_check');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkSession();
+  }, [router]);
+
+  // Show loading while checking session
+  if (isLoading) {
+    return (
+      <div className="min-h-screen w-full flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <p className="text-muted-foreground">جاري التحقق من الجلسة...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen w-full flex bg-background">

@@ -10,6 +10,20 @@ export async function GET() {
     return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
   }
 
+  // Try to get user's custom chips first
+  const { data: userChips, error: userError } = await supabase
+    .from('user_quick_chips')
+    .select('label,sort_order')
+    .eq('user_id', user.id)
+    .order('sort_order', { ascending: true });
+
+  // If user has custom chips, return them
+  if (!userError && userChips && userChips.length > 0) {
+    const labels = userChips.map((r) => r.label);
+    return NextResponse.json({ chips: labels });
+  }
+
+  // Otherwise, get default chips
   const { data, error } = await supabase
     .from('quick_chips')
     .select('label,sort_order')
@@ -18,6 +32,22 @@ export async function GET() {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-  const labels = (data ?? []).map((r) => r.label);
-  return NextResponse.json({ chips: labels });
+  
+  // Enhanced default chips with Libyan dialect
+  const defaultChips = (data ?? []).map((r) => r.label);
+  const enhancedChips = [
+    "👋 أهلاً بك، كيف أقدر أساعدك اليوم؟",
+    "💡 عطيني فكرة لمشروع جديد",
+    "🔍 اشرحلي مفهوم تقني",
+    "🛠️ ساعدني حل مشكلة برمجية",
+    "📚 نصائح للتعلم",
+    "🚀 كيف أبدأ في مجال معين؟",
+    "⚡ حلل لي كود أو خطأ",
+    "🎯 نصائح للمشاريع",
+    "😎 شو رأيك في فكرة كذا؟",
+    "🔧 عندي مشكلة في الكود",
+    ...defaultChips
+  ];
+  
+  return NextResponse.json({ chips: enhancedChips });
 }
