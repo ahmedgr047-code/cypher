@@ -383,7 +383,13 @@ export default function ChatLayout() {
 
       const responseText = (result as { choices?: Array<{ message?: { content?: string } }> })?.choices?.[0]
         ?.message?.content as string;
-      const reply = responseText || '';
+      let reply = responseText || '';
+
+      // إذا كانت الشيتات موجودة بس AI ما قالش عليها، نضيف تنبيه بالقوة
+      if (sheets.length > 0 && !reply.includes('شيت') && !reply.includes('أرشيف') && !reply.includes('متوفر')) {
+        const sheetNames = sheets.map(s => s.file_name || 'شيت').slice(0, 2).join('، ');
+        reply = `✅ وجدت ${sheets.length === 1 ? 'شيت' : sheets.length + ' شيتات'} مطابقة في الأرشيف: ${sheetNames}\n\n${reply}`;
+      }
 
       const fileCard = sheets.length > 0 ? sheetToFileCard(sheets[0]) : undefined;
 
