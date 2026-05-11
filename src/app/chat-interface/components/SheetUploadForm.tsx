@@ -8,7 +8,12 @@ import { toast } from 'sonner';
 export const SHEET_MAX_BYTES = 50 * 1024 * 1024;
 
 function safeFileName(name: string) {
-  return name.replace(/[^\w.\-\s\u0600-\u06FF]+/g, '_').trim().slice(0, 120) || 'file';
+  // نخلي بس اللاتيني والأرقام والنقطة والشرطة — نحذف العربي من اسم الملف في التخزين
+  const latinOnly = name
+    .replace(/[^\w.\-]+/g, '_')  // نحذف كل شي ما عدا a-z, 0-9, ., -, _
+    .replace(/_+/g, '_')        // ندمج الشرطات المتكررة
+    .trim();
+  return latinOnly.slice(0, 50) || 'file';  // نختصر لـ 50 حرف بس
 }
 
 type SheetUploadFormProps = {
