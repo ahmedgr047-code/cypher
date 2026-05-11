@@ -70,12 +70,13 @@ type SheetRow = {
 
 function buildSheetBlock(sheets: SheetRow[]): string {
   const top = sheets.slice(0, 5);
-  if (!top.length) return '';
+  if (!top.length) return '\n[لا توجد شيتات مطابقة في الأرشيف]';
+
   const lines = top.map(
     (s, i) =>
-      `${i + 1}. ${s.file_name || 'ملف'} (${s.id})${s.caption ? ` — ${s.caption.slice(0, 120)}` : ''}`
+      `${i + 1}. "${s.file_name || 'ملف'}" (ID: ${s.id})${s.caption ? ` - وصف: ${s.caption.slice(0, 120)}` : ''}`
   );
-  return `\nشيتات مطابقة من الأرشيف:\n${lines.join('\n')}`;
+  return `\n=== شيتات مطابقة من الأرشيف (متاحة للتحميل) ===\n${lines.join('\n')}\n=== نهاية القائمة ===`;
 }
 
 function clipHistoryForApi(
