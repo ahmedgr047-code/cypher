@@ -10,10 +10,6 @@ import {
 /** يجب أن يبقى رقماً ثابتاً — يطابق 30 ث في `lib/ai/constants.ts` (30000 ms). */
 export const maxDuration = 30;
 
-/** استخدام Edge Runtime لسرعة أفضل وتفادي قيود Serverless */
-export const runtime = 'edge';
-
-
 function formatErrorResponse(error: unknown, provider?: string) {
   const statusCode = (error as any)?.statusCode || (error as any)?.status || 500;
   const providerName = (error as any)?.llmProvider || provider || 'Unknown';
