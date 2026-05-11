@@ -443,9 +443,7 @@ export default function ChatLayout() {
       console.error('[ChatLayout] AI Error:', errorMsg);
       
       // إظهار رسالة خطأ واضحة فقط بعد فشل جميع الموديلات
-      toast.error('حدث خطأ في الاتصال بـ Cypher.', {
-        description: 'جميع موديلات AI فشلت. تحقق من إعدادات API Keys.',
-      });
+      toast.error('حدث خطأ في الاتصال بـ Cypher. جميع موديلات AI فشلت. تحقق من إعدادات API Keys.');
       
       // إزالة رسالة "جاري الكتابة" وإظهار رسالة خطأ للمستخدم
       setMessages((prev) => prev.filter((m) => m.id !== `typing-${activeConvId}`));

@@ -1,8 +1,9 @@
 /**
- * مهلة الطلب (مللي ثانية). عند تغييرها غيّر يدوياً `export const maxDuration = …` في
- * `app/api/ai/chat-completion/route.ts` إلى نفس القيمة بالثواني (رقم ثابت فقط — لا Math/استيراد).
+ * مهلة الطلب (مللي ثانية) — 30 ثانية للتوافق مع Vercel.
+ * عند تغييرها غيّر يدوياً `export const maxDuration = …` في
+ * `app/api/ai/chat-completion/route.ts` إلى نفس القيمة بالثواني.
  */
-export const AI_REQUEST_TIMEOUT_MS = 10_000;
+export const AI_REQUEST_TIMEOUT_MS = 30_000;
 
 /** أقصى رسائل سياق تُرسل للنموذج (توفير توكنات الإدخال). */
 export const AI_MAX_HISTORY_MESSAGES = 12;

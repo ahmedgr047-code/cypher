@@ -7,8 +7,11 @@ import {
   filterModelsWithValidKeys,
 } from '@/lib/ai/modelChain';
 
-/** يجب أن يبقى رقماً ثابتاً — يطابق 10 ث في `lib/ai/constants.ts` (10000 ms). */
-export const maxDuration = 10;
+/** يجب أن يبقى رقماً ثابتاً — يطابق 30 ث في `lib/ai/constants.ts` (30000 ms). */
+export const maxDuration = 30;
+
+/** استخدام Edge Runtime لسرعة أفضل وتفادي قيود Serverless */
+export const runtime = 'edge';
 
 
 function formatErrorResponse(error: unknown, provider?: string) {
@@ -30,11 +33,22 @@ function httpStatusForUpstreamFailure(upstreamCode: number): number {
 }
 
 export async function POST(request: NextRequest) {
+  const requestId = `chat-${Date.now()}`;
   let body: any = {};
+
+  console.log(`[${requestId}] Received chat completion request`);
 
   try {
     body = await request.json();
     const { provider, model, messages, stream = false, parameters = {}, failover } = body;
+    
+    console.log(`[${requestId}] Request details:`, {
+      provider: provider || 'auto',
+      model: model || 'auto',
+      failover: failover === true || !provider || !model,
+      messagesCount: messages?.length || 0,
+      stream,
+    });
 
     // تفعيل failover تلقائياً إذا لم يُحدد provider (لتجنب أخطاء GEMINI)
     const useFailover = failover === true || !provider || !model;
@@ -47,6 +61,14 @@ export async function POST(request: NextRequest) {
     }
 
     if (useFailover) {
+      console.log('[AI Failover] Starting failover process...');
+      console.log('[AI Failover] Environment check:');
+      console.log('  - GROQ_API_KEY_1:', process.env.GROQ_API_KEY_1 ? '✓ Set' : '✗ Missing');
+      console.log('  - GROQ_API_KEY_2:', process.env.GROQ_API_KEY_2 ? '✓ Set' : '✗ Missing');
+      console.log('  - GEMINI_API_KEY_1:', process.env.GEMINI_API_KEY_1 ? '✓ Set' : '✗ Missing');
+      console.log('  - GEMINI_API_KEY_2:', process.env.GEMINI_API_KEY_2 ? '✓ Set' : '✗ Missing');
+      console.log('  - OPENAI_API_KEY:', process.env.OPENAI_API_KEY ? '✓ Set' : '✗ Missing');
+      
       if (stream) {
         return NextResponse.json(
           {
@@ -59,7 +81,10 @@ export async function POST(request: NextRequest) {
 
       // الحصول على قائمة الموديلات وفلترة تلك التي لها API Keys صالحة
       const allChain = getAiFailoverChain();
+      console.log('[AI Failover] All configured models:', allChain.map(c => `${c.provider}/${c.model}`).join(', '));
+      
       const chain = filterModelsWithValidKeys(allChain);
+      console.log('[AI Failover] Models with valid keys:', chain.map(c => `${c.provider}/${c.model}`).join(', '));
       
       if (!chain.length) {
         return NextResponse.json(
@@ -92,7 +117,8 @@ export async function POST(request: NextRequest) {
               ...parameters,
             });
 
-            console.log(`[AI Failover] Success with ${entry.provider} / ${entry.model}`);
+            console.log(`[AI Failover] ✅ SUCCESS with ${entry.provider} / ${entry.model} (key ${keyIndex + 1})`);
+            console.log(`[AI Failover] Response preview:`, response?.choices?.[0]?.message?.content?.substring(0, 100) || 'No content');
             
             return NextResponse.json(response, {
               headers: {
@@ -106,8 +132,14 @@ export async function POST(request: NextRequest) {
           } catch (error) {
             const errMsg = error instanceof Error ? error.message : String(error);
             const errStatus = (error as any)?.statusCode || (error as any)?.status || 500;
+            const errStack = error instanceof Error ? error.stack : '';
             
-            console.warn(`[AI Failover] Failed ${entry.provider} / ${entry.model} (key ${keyIndex + 1}): ${errMsg}`);
+            console.error(`[AI Failover] ❌ FAILED: ${entry.provider} / ${entry.model} (key ${keyIndex + 1})`);
+            console.error(`[AI Failover]    Status: ${errStatus}`);
+            console.error(`[AI Failover]    Error: ${errMsg}`);
+            console.error(`[AI Failover]    Stack: ${errStack?.substring(0, 500)}`);
+            console.error(`[AI Failover]    API Key present: ${apiKey ? 'YES' : 'NO'}`);
+            console.error(`[AI Failover]    API Key length: ${apiKey?.length || 0}`);
             
             allErrors.push({
               provider: entry.provider,
@@ -118,10 +150,11 @@ export async function POST(request: NextRequest) {
 
             // إذا كان الخطأ لا يستدعي التبديل، نتوقف مباشرة
             if (!shouldFailOverToNextModel(error)) {
-              console.error(`[AI Failover] Non-recoverable error from ${entry.provider}, stopping.`);
+              console.error(`[AI Failover] 🛑 Non-recoverable error from ${entry.provider}, stopping.`);
               break;
             }
             
+            console.log(`[AI Failover] 🔄 Moving to next model...`);
             // خلاف ذلك، نكمل للموديل التالي
           }
         }
