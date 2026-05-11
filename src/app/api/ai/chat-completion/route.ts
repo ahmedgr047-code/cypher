@@ -7,8 +7,8 @@ import {
   filterModelsWithValidKeys,
 } from '@/lib/ai/modelChain';
 
-/** يجب أن يبقى رقماً ثابتاً — يطابق 30 ث في `lib/ai/constants.ts` (30000 ms). */
-export const maxDuration = 30;
+/** يجب أن يبقى رقماً ثابتاً — يطابق 15 ث في `lib/ai/constants.ts` (15000 ms). */
+export const maxDuration = 15;
 
 function formatErrorResponse(error: unknown, provider?: string) {
   const statusCode = (error as any)?.statusCode || (error as any)?.status || 500;
@@ -58,12 +58,13 @@ export async function POST(request: NextRequest) {
 
     if (useFailover) {
       console.log('[AI Failover] Starting failover process...');
-      console.log('[AI Failover] Environment check:');
-      console.log('  - GROQ_API_KEY_1:', process.env.GROQ_API_KEY_1 ? '✓ Set' : '✗ Missing');
-      console.log('  - GROQ_API_KEY_2:', process.env.GROQ_API_KEY_2 ? '✓ Set' : '✗ Missing');
-      console.log('  - GEMINI_API_KEY_1:', process.env.GEMINI_API_KEY_1 ? '✓ Set' : '✗ Missing');
-      console.log('  - GEMINI_API_KEY_2:', process.env.GEMINI_API_KEY_2 ? '✓ Set' : '✗ Missing');
-      console.log('  - OPENAI_API_KEY:', process.env.OPENAI_API_KEY ? '✓ Set' : '✗ Missing');
+      
+      // تحقق مفصل من المتغيرات البيئية
+      console.log('[AI Failover] Raw environment check:');
+      console.log('  - GROQ_API_KEY_1:', process.env.GROQ_API_KEY_1 ? `✓ Set (${process.env.GROQ_API_KEY_1.slice(0, 8)}...)` : '✗ Missing');
+      console.log('  - GROQ_API_KEY_2:', process.env.GROQ_API_KEY_2 ? `✓ Set (${process.env.GROQ_API_KEY_2.slice(0, 8)}...)` : '✗ Missing');
+      console.log('  - GEMINI_API_KEY_1:', process.env.GEMINI_API_KEY_1 ? `✓ Set (${process.env.GEMINI_API_KEY_1.slice(0, 8)}...)` : '✗ Missing');
+      console.log('  - GEMINI_API_KEY_2:', process.env.GEMINI_API_KEY_2 ? `✓ Set (${process.env.GEMINI_API_KEY_2.slice(0, 8)}...)` : '✗ Missing');
       
       if (stream) {
         return NextResponse.json(
@@ -81,13 +82,19 @@ export async function POST(request: NextRequest) {
       
       const chain = filterModelsWithValidKeys(allChain);
       console.log('[AI Failover] Models with valid keys:', chain.map(c => `${c.provider}/${c.model}`).join(', '));
+      console.log('[AI Failover] Valid keys count:', chain.length);
       
       if (!chain.length) {
+        console.error('[AI API] No models have valid API keys');
+        console.error('[AI API] Please verify these environment variables are set in Vercel:');
+        console.error('  - GROQ_API_KEY_1');
+        console.error('  - GROQ_API_KEY_2');
+        console.error('  - GEMINI_API_KEY_1');
+        console.error('  - GEMINI_API_KEY_2');
         return NextResponse.json(
-          {
-            error: 'No AI API keys configured for failover',
-            details:
-              'Add GEMINI_API_KEY_1 / GEMINI_API_KEY_2 and/or GROQ_API_KEY_1 / GROQ_API_KEY_2 and/or OPENAI_API_KEY (انظر .env.example)',
+          { 
+            error: 'No AI providers configured',
+            details: 'Missing API keys. Please check GROQ_API_KEY_1/2 and GEMINI_API_KEY_1/2 in Vercel Environment Variables.'
           },
           { status: 503 }
         );
@@ -129,13 +136,16 @@ export async function POST(request: NextRequest) {
             const errMsg = error instanceof Error ? error.message : String(error);
             const errStatus = (error as any)?.statusCode || (error as any)?.status || 500;
             const errStack = error instanceof Error ? error.stack : '';
+            const errCode = (error as any)?.code || 'unknown';
             
             console.error(`[AI Failover] ❌ FAILED: ${entry.provider} / ${entry.model} (key ${keyIndex + 1})`);
             console.error(`[AI Failover]    Status: ${errStatus}`);
+            console.error(`[AI Failover]    Code: ${errCode}`);
             console.error(`[AI Failover]    Error: ${errMsg}`);
             console.error(`[AI Failover]    Stack: ${errStack?.substring(0, 500)}`);
             console.error(`[AI Failover]    API Key present: ${apiKey ? 'YES' : 'NO'}`);
             console.error(`[AI Failover]    API Key length: ${apiKey?.length || 0}`);
+            console.error(`[AI Failover]    API Key prefix: ${apiKey?.slice(0, 10)}...`);
             
             allErrors.push({
               provider: entry.provider,
@@ -145,7 +155,10 @@ export async function POST(request: NextRequest) {
             });
 
             // إذا كان الخطأ لا يستدعي التبديل، نتوقف مباشرة
-            if (!shouldFailOverToNextModel(error)) {
+            const shouldFailover = shouldFailOverToNextModel(error);
+            console.error(`[AI Failover]    Should failover: ${shouldFailover}`);
+            
+            if (!shouldFailover) {
               console.error(`[AI Failover] 🛑 Non-recoverable error from ${entry.provider}, stopping.`);
               break;
             }

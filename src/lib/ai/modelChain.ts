@@ -8,14 +8,14 @@ export type AiFailoverEntry = {
 };
 
 /**
- * سلسلة الموديلات: 2 Gemini + 2 Groq
- * ترتيب: Gemini أولاً (1) ثم Groq ثم Gemini (2) ثم Groq (2)
+ * سلسلة الموديلات: Groq فقط (تجنب مشاكل HTTP/2 مع Gemini)
+ * ترتيب: نستخدم 4 موديلات Groq للـ failover
  */
 export const DEFAULT_AI_FAILOVER_CHAIN: AiFailoverEntry[] = [
-  { provider: 'GEMINI', model: 'gemini-2.0-flash' },
   { provider: 'GROQ', model: 'groq/llama-3.1-8b-instant' },
-  { provider: 'GEMINI', model: 'gemini-1.5-flash' },
   { provider: 'GROQ', model: 'groq/llama-3.3-70b-versatile' },
+  { provider: 'GROQ', model: 'groq/llama-3.1-70b-versatile' },
+  { provider: 'GROQ', model: 'groq/gemma-2-9b-it' },
 ];
 
 function parseEnvChain(): AiFailoverEntry[] | null {
@@ -95,20 +95,30 @@ export function getApiKeysForProvider(provider: string): string[] {
 
 /** أخطاء يُفترض أنها مؤقتة أو متعلقة بالحصة — ننتقل للموديل التالي. */
 export function shouldFailOverToNextModel(error: unknown): boolean {
-  const status =
-    (error as { statusCode?: number })?.statusCode ??
-    (error as { status?: number })?.status ??
-    (error as { response?: { status?: number } })?.response?.status;
-
-  /* أي خطأ 5xx أو 4xx يعني ننتقل للموديل التالي */
-  if (status === 500 || status === 501 || status === 502 || status === 503 || status === 504) return true;
-  if (status === 429 || status === 408) return true;
-  if (status === 402 || status === 403) return true;
-  /* موديل Google معطّل/غير موجود — ننتقل لـ Groq */
-  if (status === 404 || status === 410) return true;
-
-  const msg = `${error instanceof Error ? error.message : String(error)}`.toLowerCase();
-  const patterns = [
+  const statusCode = (error as any)?.statusCode || (error as any)?.status;
+  const errorMessage = String(error).toLowerCase();
+  const errorCode = (error as any)?.code || '';
+  
+  // أخطاء HTTP تستدعي failover
+  if (statusCode === 429 || statusCode === 500 || statusCode >= 502) {
+    return true;
+  }
+  
+  // أخطاء الاتصال والشبكة
+  if (
+    errorMessage.includes('timeout') ||
+    errorMessage.includes('econnreset') ||
+    errorMessage.includes('socket hang up') ||
+    errorMessage.includes('fetch failed') ||
+    errorMessage.includes('http/2') ||
+    errorMessage.includes('connection closed') ||
+    errorMessage.includes('protocol error') ||
+    errorCode === 'ECONNRESET' ||
+    errorCode === 'ERR_HTTP2_GOAWAY'
+  ) {
+    return true;
+  }
+  
     'quota',
     'rate limit',
     'ratelimit',

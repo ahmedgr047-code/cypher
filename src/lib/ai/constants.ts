@@ -1,9 +1,9 @@
 /**
- * مهلة الطلب (مللي ثانية) — 30 ثانية للتوافق مع Vercel.
+ * مهلة الطلب (مللي ثانية) — 15 ثانية لتجنب مشاكل HTTP/2
  * عند تغييرها غيّر يدوياً `export const maxDuration = …` في
  * `app/api/ai/chat-completion/route.ts` إلى نفس القيمة بالثواني.
  */
-export const AI_REQUEST_TIMEOUT_MS = 30_000;
+export const AI_REQUEST_TIMEOUT_MS = 15_000;
 
 /** أقصى رسائل سياق تُرسل للنموذج (توفير توكنات الإدخال). */
 export const AI_MAX_HISTORY_MESSAGES = 12;
