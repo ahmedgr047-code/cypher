@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { completion } from '@rocketnew/llm-sdk';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import Groq from 'groq-sdk';
 
 // Edge runtime for long AI inferences without timeouts
 export const runtime = 'edge';
@@ -24,18 +25,23 @@ const PROVIDERS = [
   {
     name: 'Groq_Llama_1',
     provider: 'GROQ',
-    model: 'groq/llama-3.1-8b-instant',
+    model: 'llama-3.1-8b-instant',
     keyEnv: 'GROQ_API_KEY_1',
     keyPrefix: 'gsk_',
   },
   {
     name: 'Groq_Llama_2',
     provider: 'GROQ',
-    model: 'groq/llama-3.3-70b-versatile',
+    model: 'llama-3.3-70b-versatile',
     keyEnv: 'GROQ_API_KEY_2',
     keyPrefix: 'gsk_',
   },
 ];
+
+// Generate UUID using Web Crypto API (Edge compatible)
+function generateId(): string {
+  return crypto.randomUUID();
+}
 
 // Check if error is recoverable (can try next provider)
 function isRecoverableError(error: unknown): boolean {
@@ -68,6 +74,54 @@ function logProviderError(providerName: string, error: unknown, keyPresent: bool
   console.error(`[AI Route]    Error: ${errorMessage.substring(0, 200)}`);
   console.error(`[AI Route]    API Key Present: ${keyPresent}`);
   console.error(`[AI Route]    Recoverable: ${isRecoverableError(error)}`);
+}
+
+// Call Gemini API using official SDK
+async function callGemini(apiKey: string, model: string, messages: any[]) {
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const genModel = genAI.getGenerativeModel({ model });
+  
+  // Convert messages to Gemini format
+  const chat = genModel.startChat({
+    history: messages.slice(0, -1).map(m => ({
+      role: m.role === 'user' ? 'user' : 'model',
+      parts: [{ text: m.content }],
+    })),
+  });
+  
+  const lastMessage = messages[messages.length - 1];
+  const result = await chat.sendMessage(lastMessage.content);
+  const response = await result.response;
+  const text = response.text();
+  
+  return {
+    id: `chatcmpl-${generateId()}`,
+    object: 'chat.completion',
+    created: Math.floor(Date.now() / 1000),
+    model: model,
+    choices: [{
+      index: 0,
+      message: {
+        role: 'assistant',
+        content: text,
+      },
+      finish_reason: 'stop',
+    }],
+  };
+}
+
+// Call Groq API using official SDK
+async function callGroq(apiKey: string, model: string, messages: any[]) {
+  const groq = new Groq({ apiKey });
+  
+  const response = await groq.chat.completions.create({
+    model: model,
+    messages: messages,
+    temperature: 0.7,
+    max_tokens: 2048,
+  });
+  
+  return response;
 }
 
 export async function POST(request: NextRequest) {
@@ -117,13 +171,13 @@ export async function POST(request: NextRequest) {
       console.log(`[AI Route] [${requestId}] Trying ${provider.name} (${provider.provider}/${provider.model})...`);
       
       try {
-        const response = await completion({
-          model: provider.model,
-          messages,
-          stream: false,
-          api_key: provider.apiKey!,
-          ...parameters,
-        });
+        let response;
+        
+        if (provider.provider === 'GEMINI') {
+          response = await callGemini(provider.apiKey!, provider.model, messages);
+        } else {
+          response = await callGroq(provider.apiKey!, provider.model, messages);
+        }
 
         // Validate response structure
         if (!response || typeof response !== 'object') {
