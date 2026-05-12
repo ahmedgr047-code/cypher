@@ -6,6 +6,7 @@ import { UserSettingsProvider } from '@/components/providers/UserSettingsProvide
 import { NewSidebar } from '@/components/NewSidebar';
 import { default as NewWorkbench } from '@/components/NewWorkbench';
 import AuthCards from '@/components/AuthCards';
+import { DebugPanel } from '@/components/DebugPanel';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
@@ -47,21 +48,42 @@ export default function LayoutClient({ children }: LayoutClientProps) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConvId, setActiveConvId] = useState<string | null>(null);
   const [codeBlocks, setCodeBlocks] = useState<CodeBlock[]>([]);
+  const [connectionStatus, setConnectionStatus] = useState<'loading' | 'success' | 'error'>('loading');
+  const [lastError, setLastError] = useState<string | undefined>();
 
   // Check authentication on mount
   useEffect(() => {
     const checkAuth = async () => {
       try {
+        console.log('Checking authentication...');
         const response = await fetch('/api/profile');
-        if (response.ok) {
-          const user = await response.json();
+        
+        if (!response.ok) {
+          console.log('Profile response not ok:', response.status);
+          setConnectionStatus('error');
+          setLastError(`فشل الاتصال: ${response.status} ${response.statusText}`);
           setAuthState({
-            isAuthenticated: true,
+            isAuthenticated: false,
             isLoading: false,
-            user
+            user: null,
+            error: 'غير مصرح بالدخول'
           });
-          
-          // Load conversations
+          return;
+        }
+
+        const user = await response.json();
+        console.log('User authenticated:', user);
+        setConnectionStatus('success');
+        setLastError(undefined);
+        
+        setAuthState({
+          isAuthenticated: true,
+          isLoading: false,
+          user
+        });
+        
+        // Load conversations
+        try {
           const convResponse = await fetch('/api/conversations');
           if (convResponse.ok) {
             const convData = await convResponse.json();
@@ -70,19 +92,16 @@ export default function LayoutClient({ children }: LayoutClientProps) {
               setActiveConvId(convData.conversations[0].id);
             }
           }
-        } else {
-          setAuthState({
-            isAuthenticated: false,
-            isLoading: false,
-            user: null
-          });
+        } catch (convError) {
+          console.error('Failed to load conversations:', convError);
         }
       } catch (error) {
+        console.error('Auth check failed:', error);
         setAuthState({
           isAuthenticated: false,
           isLoading: false,
           user: null,
-          error: 'فشل الاتصال بالخادم'
+          error: 'فشل الاتصال بالخادم. الرجاء التحقق من إعدادات Supabase.'
         });
       }
     };
@@ -195,6 +214,25 @@ export default function LayoutClient({ children }: LayoutClientProps) {
     setIsSplitScreen(!isSplitScreen);
   };
 
+  const testConnection = async () => {
+    setConnectionStatus('loading');
+    setLastError(undefined);
+    
+    try {
+      const response = await fetch('/api/profile');
+      if (response.ok) {
+        setConnectionStatus('success');
+        setLastError('الاتصال ناجح!');
+      } else {
+        setConnectionStatus('error');
+        setLastError(`فشل الاتصال: ${response.status}`);
+      }
+    } catch (error) {
+      setConnectionStatus('error');
+      setLastError(`خطأ في الشبكة: ${error}`);
+    }
+  };
+
   // Show auth cards if not authenticated
   if (!authState.isAuthenticated) {
     return (
@@ -260,6 +298,13 @@ export default function LayoutClient({ children }: LayoutClientProps) {
           isSplitScreen={false}
         />
       )}
+
+      {/* Debug Panel */}
+      <DebugPanel
+        onTestConnection={testConnection}
+        connectionStatus={connectionStatus}
+        lastError={lastError}
+      />
 
       <Toaster
         position="bottom-right"
