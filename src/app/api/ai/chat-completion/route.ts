@@ -9,31 +9,17 @@ export const maxDuration = 30; // Reduced from 60 for faster responses
 // Provider configuration
 const PROVIDERS = [
   {
-    name: 'Gemini_Pro_1',
+    name: 'Gemini_Pro',
     provider: 'GEMINI',
     model: 'gemini-2.0-flash',
-    keyEnv: 'GEMINI_API_KEY_1',
+    keyEnv: 'GEMINI_API_KEY',
     keyPrefix: 'AIza',
   },
   {
-    name: 'Gemini_Pro_2',
-    provider: 'GEMINI',
-    model: 'gemini-2.0-flash-lite',
-    keyEnv: 'GEMINI_API_KEY_2',
-    keyPrefix: 'AIza',
-  },
-  {
-    name: 'Groq_Llama_1',
+    name: 'Groq_Llama',
     provider: 'GROQ',
     model: 'llama-3.1-8b-instant',
-    keyEnv: 'GROQ_API_KEY_1',
-    keyPrefix: 'gsk_',
-  },
-  {
-    name: 'Groq_Llama_2',
-    provider: 'GROQ',
-    model: 'llama-3.3-70b-versatile',
-    keyEnv: 'GROQ_API_KEY_2',
+    keyEnv: 'GROQ_API_KEY',
     keyPrefix: 'gsk_',
   },
 ];

@@ -113,33 +113,46 @@ export default function LayoutClient({ children }: LayoutClientProps) {
     setAuthState(prev => ({ ...prev, isLoading: true, error: undefined }));
     
     try {
+      console.log('Attempting login with:', email);
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
       });
 
-      if (response.ok) {
-        const user = await response.json();
+      const data = await response.json();
+      console.log('Login response:', data);
+
+      if (response.ok && data.user) {
         setAuthState({
           isAuthenticated: true,
           isLoading: false,
-          user
+          user: {
+            fullName: data.user.fullName,
+            email: data.user.email,
+            studentId: data.user.studentId || null
+          }
         });
+        setConnectionStatus('success');
+        setLastError(undefined);
       } else {
-        const error = await response.json();
         setAuthState(prev => ({
           ...prev,
           isLoading: false,
-          error: error.message || 'فشل تسجيل الدخول'
+          error: data.error || 'فشل تسجيل الدخول'
         }));
+        setConnectionStatus('error');
+        setLastError(data.error || 'فشل تسجيل الدخول');
       }
     } catch (error) {
+      console.error('Login error:', error);
       setAuthState(prev => ({
         ...prev,
         isLoading: false,
         error: 'فشل الاتصال بالخادم'
       }));
+      setConnectionStatus('error');
+      setLastError('فشل الاتصال بالخادم');
     }
   };
 
@@ -147,33 +160,46 @@ export default function LayoutClient({ children }: LayoutClientProps) {
     setAuthState(prev => ({ ...prev, isLoading: true, error: undefined }));
     
     try {
+      console.log('Attempting signup with:', { fullName, email });
       const response = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fullName, email, password })
       });
 
-      if (response.ok) {
-        const user = await response.json();
+      const data = await response.json();
+      console.log('Signup response:', data);
+
+      if (response.ok && data.user) {
         setAuthState({
           isAuthenticated: true,
           isLoading: false,
-          user
+          user: {
+            fullName: data.user.fullName,
+            email: data.user.email,
+            studentId: data.user.studentId || null
+          }
         });
+        setConnectionStatus('success');
+        setLastError(undefined);
       } else {
-        const error = await response.json();
         setAuthState(prev => ({
           ...prev,
           isLoading: false,
-          error: error.message || 'فشل إنشاء الحساب'
+          error: data.error || 'فشل إنشاء الحساب'
         }));
+        setConnectionStatus('error');
+        setLastError(data.error || 'فشل إنشاء الحساب');
       }
     } catch (error) {
+      console.error('Signup error:', error);
       setAuthState(prev => ({
         ...prev,
         isLoading: false,
         error: 'فشل الاتصال بالخادم'
       }));
+      setConnectionStatus('error');
+      setLastError('فشل الاتصال بالخادم');
     }
   };
 
