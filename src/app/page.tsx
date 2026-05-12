@@ -30,7 +30,7 @@ export default function HomePage() {
 
   const quickChips = [
     "ابحث عن شيتات الرياضيات",
-    "شرح درس الفيزياء",
+    "شرح درس الفيزياء", 
     "مساعدة في الكيمياء",
     "ملخصات الأحياء"
   ];
@@ -43,6 +43,7 @@ export default function HomePage() {
     scrollToBottom();
   }, [messages, isTyping]);
 
+  // AI Function - Connected to the fixed API route
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!input.trim() && !attachedFile) return;
@@ -322,7 +323,7 @@ export default function HomePage() {
               )}
             </div>
 
-            {/* Input Form - New Cypher UI Style */}
+            {/* Input Form - Connected to AI Function */}
             <form onSubmit={handleSubmit} className="flex gap-3">
               <div className="flex-1 relative">
                 <Textarea

@@ -229,9 +229,16 @@ export async function POST(request: NextRequest) {
 
     console.log(`[AI Route] [${requestId}] Processing ${messages.length} messages, stream=${stream}`);
 
-    // Check all API keys availability
+    // Check all API keys availability with fallback system
     const availableProviders = PROVIDERS.map(p => {
-      const key = process.env[p.keyEnv];
+      let key;
+      if (p.keyEnv === 'GROQ_API_KEY1') {
+        key = process.env.GROQ_API_KEY1 || process.env.GROQ_API_KEY2;
+      } else if (p.keyEnv === 'GEMINI_API_KEY1') {
+        key = process.env.GEMINI_API_KEY1 || process.env.GEMINI_API_KEY2;
+      } else {
+        key = process.env[p.keyEnv];
+      }
       const isValid = !!key && key.startsWith(p.keyPrefix);
       console.log(`[AI Route] [${requestId}] ${p.name}: ${isValid ? '✓ Available' : '✗ Missing/Invalid'} (${p.keyEnv})`);
       return { ...p, apiKey: key, isValid };
