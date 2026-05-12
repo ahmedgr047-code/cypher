@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Paperclip, Mic, Bot, User, Expand } from "lucide-react";
+import { Send, Paperclip, Mic, Bot, User, Expand, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { StudySheetCard } from "@/components/ui/StudySheetCard";
@@ -38,9 +38,9 @@ export default function NewChatInterface({
   onOpenSidebar,
   conversationTitle,
   quickChips,
-  inputPlaceholder = 'Message Cypher...',
+  inputPlaceholder = 'اكتب سؤالك أو ارفع ملفاً للتحليل…',
   emptySubtitle = 'أخبرني باسم المادة وسأساعدك؛ الشيتات المطابقة تُستخرج من أرشيف المعهد.',
-  footerNote = 'Cypher may produce inaccurate information. Verify important details.',
+  footerNote = 'معهد الشموخ — أرشيف الشيتات والمناهج',
   connectedLabel = 'Cypher متصل',
   onCodeGenerated,
   onExpandCode,
@@ -51,7 +51,7 @@ export default function NewChatInterface({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    messagesEndRef.current?.scrollIntoView({ behavior: "auto", block: "end" });
   };
 
   useEffect(() => {
@@ -65,13 +65,14 @@ export default function NewChatInterface({
     const messageText = input;
     setInput("");
 
-    // Call the original onSendMessage callback (keeps same logic)
+    // Call the onSendMessage callback
     onSendMessage(messageText);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
+      // Create a synthetic form event
       const formEvent = new Event('submit', { cancelable: true }) as any;
       formEvent.preventDefault = () => {};
       handleSubmit(formEvent);
@@ -79,6 +80,7 @@ export default function NewChatInterface({
   };
 
   const handleExpandCode = (code: { language: string; content: string }) => {
+    // Future: implement code expansion in workbench
     console.log("Expand code:", code);
     onExpandCode?.(code);
   };
@@ -89,175 +91,165 @@ export default function NewChatInterface({
   };
 
   const isEmpty = messages.length === 0;
-  const personaName = persona?.name || "Cypher";
-
-  // Convert timestamp to Date object for proper display - FIX INVALID DATE
-  const formatTimestamp = (timestamp: string) => {
-    try {
-      const date = new Date(timestamp);
-      // Check if date is valid
-      if (isNaN(date.getTime())) {
-        return new Date().toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        });
-      }
-      return date.toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-    } catch (error) {
-      return new Date().toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-    }
-  };
 
   return (
-    <div className="flex flex-col h-full bg-background">
-      {/* Persona Status - Exact from new cypher ui */}
-      <div className="px-4 py-3 border-b border-border shrink-0">
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex items-center gap-2"
-        >
-          <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
-          <span className="text-sm text-muted-foreground">
-            {isTyping ? (
-              <span className="text-primary">{personaName} is analyzing your request...</span>
-            ) : (
-              <span>{personaName} is ready to help</span>
-            )}
-          </span>
-        </motion.div>
+    <div className="flex flex-col h-full bg-black" dir="rtl">
+      {/* Topbar */}
+      <div className="flex-shrink-0 h-14 bg-black/80 backdrop-blur-sm border-b border-red-500/20 flex items-center justify-between px-4 gap-3">
+        {/* Left: mobile menu + title */}
+        <div className="flex items-center gap-3 min-w-0">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onOpenSidebar}
+            className="text-red-400 hover:text-red-300 hover:bg-red-600/10 shrink-0 lg:hidden"
+          >
+            <Menu className="w-5 h-5" />
+          </Button>
+          <div className="min-w-0">
+            <h1 className="text-sm font-semibold text-white truncate">{conversationTitle}</h1>
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+              <span className="text-xs text-red-400">{connectedLabel}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Right: bot status */}
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 px-2 py-1 bg-red-600/20 border border-red-500/30 rounded-full">
+            <Bot className="w-3 h-3 text-red-400" />
+            <span className="text-xs text-red-300">
+              {isTyping ? 'يكتب...' : 'متصل'}
+            </span>
+          </div>
+        </div>
       </div>
 
-      {/* Messages - Exact from new cypher ui */}
-      <div className="flex-1 overflow-y-auto px-4 py-6 space-y-6 min-h-0">
-        {/* Quick Chips for Empty State */}
-        {isEmpty && quickChips.length > 0 && (
-          <div className="flex flex-wrap gap-2 mb-6">
-            {quickChips.map((chip, index) => (
-              <motion.button
-                key={index}
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: index * 0.1, duration: 0.3 }}
-                onClick={() => handleChipClick(chip)}
-                className="px-4 py-2 bg-secondary hover:bg-secondary/80 border border-border rounded-lg text-sm text-muted-foreground hover:text-foreground transition-all duration-200"
-              >
-                {chip}
-              </motion.button>
-            ))}
+      {/* Messages area */}
+      <div className="flex-1 overflow-y-auto px-4 py-6">
+        {/* Empty state with quick chips */}
+        {isEmpty && (
+          <div className="flex flex-col items-center justify-center h-full text-center">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center border border-red-500/30 mb-6">
+              <Bot className="w-8 h-8 text-white" />
+            </div>
+            <h2 className="text-xl font-semibold text-white mb-2">مرحباً بك في Cypher</h2>
+            <p className="text-red-400 text-sm mb-8 max-w-md">{emptySubtitle}</p>
+            <div className="flex flex-wrap gap-2 justify-center max-w-lg">
+              {quickChips.map((chip, index) => (
+                <motion.button
+                  key={index}
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: index * 0.1, duration: 0.3 }}
+                  onClick={() => handleChipClick(chip)}
+                  className="px-4 py-2 bg-red-600/20 border border-red-500/30 rounded-lg text-red-300 text-sm hover:bg-red-600/30 hover:border-red-500/50 transition-all duration-200"
+                >
+                  {chip}
+                </motion.button>
+              ))}
+            </div>
           </div>
         )}
 
-        <AnimatePresence initial={false}>
-          {messages.map((message) => (
-            <motion.div
-              key={message.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.3 }}
-              className={cn(
-                "flex gap-3",
-                message.role === "user" ? "justify-end" : "justify-start"
-              )}
-            >
-              {message.role === "bot" && (
-                <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
-                  <Bot className="w-4 h-4 text-primary" />
-                </div>
-              )}
-
-              <div
+        {/* Messages */}
+        <div className="space-y-4">
+          <AnimatePresence initial={false}>
+            {messages.map((message) => (
+              <motion.div
+                key={message.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.3 }}
                 className={cn(
-                  "max-w-[85%] md:max-w-[80%] rounded-2xl px-4 py-3",
-                  message.role === "user"
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-card border border-border"
+                  "flex gap-3",
+                  message.role === "user" ? "justify-end" : "justify-start"
                 )}
               >
-                <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                  {message.content}
-                </p>
+                {message.role === "bot" && (
+                  <div className="w-8 h-8 rounded-full bg-red-600/20 flex items-center justify-center shrink-0">
+                    <Bot className="w-4 h-4 text-red-400" />
+                  </div>
+                )}
 
-                {/* Code Blocks - Exact from new cypher ui */}
-                {message.content && message.content.includes('```') && (
-                  <div className="mt-3 rounded-lg overflow-hidden border border-primary/20">
-                    <div className="bg-secondary/50 px-3 py-1.5 text-xs text-muted-foreground flex items-center justify-between">
-                      <span>Code</span>
-                      <div className="flex items-center gap-2">
-                        <button 
-                          onClick={() => {
-                            const codeMatch = message.content.match(/```(\w+)?\n([\s\S]*?)\n```/);
-                            if (codeMatch) {
-                              handleExpandCode({
-                                language: codeMatch[1] || 'text',
-                                content: codeMatch[2].trim()
-                              });
-                            }
-                          }}
-                          className="text-primary hover:text-primary/80 transition-colors flex items-center gap-1"
-                        >
-                          <Expand className="w-3 h-3" />
-                          Open in Workbench
-                        </button>
+                <div
+                  className={cn(
+                    "max-w-xs lg:max-w-md xl:max-w-lg",
+                    message.role === "user"
+                      ? "bg-red-600 text-white rounded-2xl rounded-tl-none"
+                      : "bg-red-950/50 border border-red-500/30 text-white rounded-2xl rounded-tr-none"
+                  )}
+                >
+                  <div className="p-4">
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
+
+                    {/* Code blocks */}
+                    {message.content.includes('```') && (
+                      <div className="mt-3 rounded-lg overflow-hidden border border-red-500/30">
+                        <div className="bg-red-600/10 px-3 py-2 text-xs text-red-400 flex items-center justify-between">
+                          <span>
+                            {message.content.match(/```(\w+)?/)?.[1] || 'code'}
+                          </span>
+                          <button
+                            onClick={() => {
+                              const codeMatch = message.content.match(/```(\w+)?\n([\s\S]*?)\n```/);
+                              if (codeMatch) {
+                                handleExpandCode({
+                                  language: codeMatch[1] || 'text',
+                                  content: codeMatch[2].trim()
+                                });
+                              }
+                            }}
+                            className="text-red-300 hover:text-red-200 flex items-center gap-1"
+                          >
+                            <Expand className="w-3 h-3" />
+                            فتح
+                          </button>
+                        </div>
+                        <pre className="p-3 text-xs overflow-x-auto bg-red-600/5">
+                          <code className="text-red-100">
+                            {message.content.match(/```[\s\S]*?\n([\s\S]*?)\n```/)?.[1]}
+                          </code>
+                        </pre>
                       </div>
-                    </div>
+                    )}
+
+                    {/* File cards */}
+                    {message.fileCard && (
+                      <div className="mt-3">
+                        <StudySheetCard
+                          title={message.fileCard.fileName}
+                          fileSize={message.fileCard.fileSize}
+                        />
+                      </div>
+                    )}
+
+                    {message.fileCards && message.fileCards.length > 0 && (
+                      <div className="mt-3 space-y-2">
+                        {message.fileCards.map((fileCard, index) => (
+                          <StudySheetCard
+                            key={index}
+                            title={fileCard.fileName}
+                            fileSize={fileCard.fileSize}
+                          />
+                        ))}
+                      </div>
+                    )}
                   </div>
-                )}
-
-                {/* Study Sheet Cards - Support for fileCard and fileCards */}
-                {message.fileCard && (
-                  <div className="mt-4">
-                    <StudySheetCard
-                      title={message.fileCard.fileName}
-                      fileSize={message.fileCard.fileSize}
-                      subject={message.fileCard.subject}
-                      semester={message.fileCard.semester}
-                      pages={message.fileCard.pages}
-                      downloadUrl={message.fileCard.downloadUrl}
-                    />
-                  </div>
-                )}
-
-                {message.fileCards && message.fileCards.length > 0 && (
-                  <div className="mt-4 space-y-2">
-                    {message.fileCards.map((fileCard, index) => (
-                      <StudySheetCard
-                        key={index}
-                        title={fileCard.fileName}
-                        fileSize={fileCard.fileSize}
-                        subject={fileCard.subject}
-                        semester={fileCard.semester}
-                        pages={fileCard.pages}
-                        downloadUrl={fileCard.downloadUrl}
-                      />
-                    ))}
-                  </div>
-                )}
-
-                {/* Fixed timestamp display */}
-                <p className="text-[10px] text-muted-foreground mt-2 opacity-60">
-                  {formatTimestamp(message.timestamp)}
-                </p>
-              </div>
-
-              {message.role === "user" && (
-                <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center shrink-0">
-                  <User className="w-4 h-4 text-foreground" />
                 </div>
-              )}
-            </motion.div>
-          ))}
-        </AnimatePresence>
 
-        {/* Typing Indicator - Exact from new cypher ui */}
-        <AnimatePresence>
+                {message.role === "user" && (
+                  <div className="w-8 h-8 rounded-full bg-red-600 flex items-center justify-center shrink-0">
+                    <User className="w-4 h-4 text-white" />
+                  </div>
+                )}
+              </motion.div>
+            ))}
+          </AnimatePresence>
+
+          {/* Typing indicator */}
           {isTyping && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
@@ -265,18 +257,18 @@ export default function NewChatInterface({
               exit={{ opacity: 0, y: -10 }}
               className="flex gap-3"
             >
-              <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
-                <Bot className="w-4 h-4 text-primary" />
+              <div className="w-8 h-8 rounded-full bg-red-600/20 flex items-center justify-center">
+                <Bot className="w-4 h-4 text-red-400" />
               </div>
-              <div className="bg-card border border-border rounded-2xl px-4 py-3">
+              <div className="bg-red-950/50 border border-red-500/30 rounded-2xl rounded-tr-none px-4 py-3">
                 <div className="flex gap-1">
                   {[0, 1, 2].map((i) => (
                     <motion.div
                       key={i}
-                      className="w-2 h-2 bg-primary rounded-full"
-                      animate={{ y: [0, -8, 0] }}
+                      className="w-2 h-2 bg-red-400 rounded-full"
+                      animate={{ scale: [1, 1.2, 1] }}
                       transition={{
-                        duration: 0.6,
+                        duration: 0.8,
                         repeat: Infinity,
                         delay: i * 0.1,
                       }}
@@ -286,57 +278,47 @@ export default function NewChatInterface({
               </div>
             </motion.div>
           )}
-        </AnimatePresence>
+        </div>
 
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Area - Exact from new cypher ui */}
-      <div className="p-4 border-t border-border bg-background shrink-0">
-        <form onSubmit={handleSubmit} className="relative">
-          <div className="flex items-end gap-2 bg-card border border-border rounded-2xl p-2">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="text-muted-foreground hover:text-foreground shrink-0"
-            >
-              <Paperclip className="w-5 h-5" />
-            </Button>
-
+      {/* Input area */}
+      <div className="flex-shrink-0 p-4 border-t border-red-500/20">
+        <form onSubmit={handleSubmit} className="flex gap-3">
+          <div className="flex-1 relative">
             <Textarea
               ref={textareaRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder={inputPlaceholder}
-              className="flex-1 min-h-[44px] max-h-32 resize-none border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 text-sm"
+              className="bg-red-950/50 border border-red-500/30 rounded-xl text-white placeholder-red-500/50 resize-none h-12 pr-12"
               rows={1}
             />
-
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="text-muted-foreground hover:text-foreground shrink-0"
-            >
-              <Mic className="w-5 h-5" />
-            </Button>
-
-            <Button
-              type="submit"
-              size="icon"
-              disabled={!input.trim()}
-              className="bg-primary hover:bg-primary/90 text-primary-foreground shrink-0 disabled:opacity-50"
-            >
-              <Send className="w-4 h-4" />
-            </Button>
+            
+            {/* File attach button */}
+            <label className="absolute left-3 top-3 cursor-pointer">
+              <input
+                type="file"
+                className="hidden"
+                accept="image/*,.pdf,.doc,.docx"
+              />
+              <Paperclip className="w-4 h-4 text-red-400 hover:text-red-300 transition-colors" />
+            </label>
           </div>
+
+          <Button
+            type="submit"
+            disabled={!input.trim()}
+            className="bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-semibold px-6 h-12 rounded-xl transition-all duration-200 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Send className="w-4 h-4 ml-2" />
+            إرسال
+          </Button>
         </form>
 
-        <p className="text-[10px] text-center text-muted-foreground mt-2">
-          {footerNote}
-        </p>
+        <p className="text-xs text-red-500 text-center mt-2">{footerNote}</p>
       </div>
     </div>
   );
