@@ -91,9 +91,32 @@ export default function NewChatInterface({
   const isEmpty = messages.length === 0;
   const personaName = persona?.name || "Cypher";
 
+  // Convert timestamp to Date object for proper display - FIX INVALID DATE
+  const formatTimestamp = (timestamp: string) => {
+    try {
+      const date = new Date(timestamp);
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        return new Date().toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+      }
+      return date.toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch (error) {
+      return new Date().toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    }
+  };
+
   return (
     <div className="flex flex-col h-full bg-background">
-      {/* Persona Status - New Design from new cypher ui */}
+      {/* Persona Status - Exact from new cypher ui */}
       <div className="px-4 py-3 border-b border-border shrink-0">
         <motion.div
           initial={{ opacity: 0, y: -10 }}
@@ -111,7 +134,7 @@ export default function NewChatInterface({
         </motion.div>
       </div>
 
-      {/* Messages - New Design from new cypher ui */}
+      {/* Messages - Exact from new cypher ui */}
       <div className="flex-1 overflow-y-auto px-4 py-6 space-y-6 min-h-0">
         {/* Quick Chips for Empty State */}
         {isEmpty && quickChips.length > 0 && (
@@ -162,8 +185,8 @@ export default function NewChatInterface({
                   {message.content}
                 </p>
 
-                {/* Code Blocks */}
-                {message.role === "bot" && message.content.includes('```') && (
+                {/* Code Blocks - Exact from new cypher ui */}
+                {message.content && message.content.includes('```') && (
                   <div className="mt-3 rounded-lg overflow-hidden border border-primary/20">
                     <div className="bg-secondary/50 px-3 py-1.5 text-xs text-muted-foreground flex items-center justify-between">
                       <span>Code</span>
@@ -188,11 +211,39 @@ export default function NewChatInterface({
                   </div>
                 )}
 
+                {/* Study Sheet Cards - Support for fileCard and fileCards */}
+                {message.fileCard && (
+                  <div className="mt-4">
+                    <StudySheetCard
+                      title={message.fileCard.fileName}
+                      fileSize={message.fileCard.fileSize}
+                      subject={message.fileCard.subject}
+                      semester={message.fileCard.semester}
+                      pages={message.fileCard.pages}
+                      downloadUrl={message.fileCard.downloadUrl}
+                    />
+                  </div>
+                )}
+
+                {message.fileCards && message.fileCards.length > 0 && (
+                  <div className="mt-4 space-y-2">
+                    {message.fileCards.map((fileCard, index) => (
+                      <StudySheetCard
+                        key={index}
+                        title={fileCard.fileName}
+                        fileSize={fileCard.fileSize}
+                        subject={fileCard.subject}
+                        semester={fileCard.semester}
+                        pages={fileCard.pages}
+                        downloadUrl={fileCard.downloadUrl}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {/* Fixed timestamp display */}
                 <p className="text-[10px] text-muted-foreground mt-2 opacity-60">
-                  {new Date(message.timestamp).toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
+                  {formatTimestamp(message.timestamp)}
                 </p>
               </div>
 
@@ -205,7 +256,7 @@ export default function NewChatInterface({
           ))}
         </AnimatePresence>
 
-        {/* Typing Indicator - New Design from new cypher ui */}
+        {/* Typing Indicator - Exact from new cypher ui */}
         <AnimatePresence>
           {isTyping && (
             <motion.div
@@ -240,7 +291,7 @@ export default function NewChatInterface({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Area - New Design from new cypher ui */}
+      {/* Input Area - Exact from new cypher ui */}
       <div className="p-4 border-t border-border bg-background shrink-0">
         <form onSubmit={handleSubmit} className="relative">
           <div className="flex items-end gap-2 bg-card border border-border rounded-2xl p-2">

@@ -6,20 +6,34 @@ import Groq from 'groq-sdk';
 export const runtime = 'edge';
 export const maxDuration = 30; // Reduced from 60 for faster responses
 
-// Provider configuration
+// Provider configuration with multiple keys and fallback system
 const PROVIDERS = [
   {
-    name: 'Gemini_Pro',
+    name: 'Gemini_Pro_1',
     provider: 'GEMINI',
     model: 'gemini-2.0-flash',
-    keyEnv: 'GEMINI_API_KEY',
+    keyEnv: 'GEMINI_API_KEY1',
     keyPrefix: 'AIza',
   },
   {
-    name: 'Groq_Llama',
+    name: 'Gemini_Pro_2',
+    provider: 'GEMINI',
+    model: 'gemini-2.0-flash',
+    keyEnv: 'GEMINI_API_KEY2',
+    keyPrefix: 'AIza',
+  },
+  {
+    name: 'Groq_Llama_1',
     provider: 'GROQ',
     model: 'llama-3.1-8b-instant',
-    keyEnv: 'GROQ_API_KEY',
+    keyEnv: 'GROQ_API_KEY1',
+    keyPrefix: 'gsk_',
+  },
+  {
+    name: 'Groq_Llama_2',
+    provider: 'GROQ',
+    model: 'llama-3.1-8b-instant',
+    keyEnv: 'GROQ_API_KEY2',
     keyPrefix: 'gsk_',
   },
 ];
