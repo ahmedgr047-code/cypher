@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import ChatSidebar from './ChatSidebar';
-import ChatMain from './ChatMain';
+import NewChatInterface from './NewChatInterface';
 import SettingsPanel from './SettingsPanel';
 import type { Message, Conversation, FileCard } from '@/types/chat';
 import { AttachedFile } from './ChatInput';
@@ -500,7 +500,7 @@ export default function ChatLayout() {
       </div>
 
       <div className="flex-1 flex flex-col min-w-0">
-        <ChatMain
+        <NewChatInterface
           messages={messages}
           isTyping={isTyping}
           onSendMessage={handleSendMessage}
