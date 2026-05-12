@@ -1,0 +1,24 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": ".next",
+  "installCommand": "npm install",
+  "framework": "nextjs",
+  "env": {
+    "NEXT_PUBLIC_SUPABASE_URL": "@supabase-url",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "@supabase-anon-key",
+    "SUPABASE_SERVICE_ROLE_KEY": "@supabase-service-role-key",
+    "GEMINI_API_KEY_1": "@gemini-api-key-1",
+    "GEMINI_API_KEY_2": "@gemini-api-key-2",
+    "GROQ_API_KEY_1": "@groq-api-key-1",
+    "GROQ_API_KEY_2": "@groq-api-key-2",
+    "GEMINI_MODEL": "@gemini-model",
+    "GROQ_MODEL": "@groq-model",
+    "NEXTAUTH_URL": "@nextauth-url",
+    "NEXTAUTH_SECRET": "@nextauth-secret"
+  },
+  "functions": {
+    "app/api/**/*.ts": {
+      "maxDuration": 30
+    }
+  }
+}
