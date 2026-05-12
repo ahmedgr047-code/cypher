@@ -8,7 +8,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { StudySheetCard } from "@/components/ui/StudySheetCard";
 import { cn } from "@/lib/utils";
 import type { Message, FileCard } from "@/types/chat";
-import { AttachedFile } from "./ChatInput";
+
+interface AttachedFile {
+  file: File;
+  type: "image" | "file";
+  dataUri: string;
+}
 
 interface NewChatInterfaceProps {
   messages: Message[];
@@ -61,7 +66,10 @@ export default function NewChatInterface({
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      handleSubmit(e);
+      // Create a synthetic form event
+      const formEvent = new Event('submit', { cancelable: true }) as any;
+      formEvent.preventDefault = () => {};
+      handleSubmit(formEvent);
     }
   };
 
@@ -160,8 +168,8 @@ export default function NewChatInterface({
                 message.role === "user" ? "justify-end" : "justify-start"
               )}
             >
-              {message.role === "assistant" && (
-                <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+              {message.role === "bot" && (
+                <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
                   <Bot className="w-4 h-4 text-primary" />
                 </div>
               )}
@@ -191,10 +199,7 @@ export default function NewChatInterface({
                 ))}
 
                 <p className="text-[10px] text-muted-foreground mt-2 opacity-60">
-                  {message.timestamp.toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
+                  {message.timestamp}
                 </p>
               </div>
 
@@ -241,6 +246,29 @@ export default function NewChatInterface({
 
         <div ref={messagesEndRef} />
       </div>
+
+      {/* Quick Chips - Only show when empty */}
+      {isEmpty && quickChips.length > 0 && (
+        <div className="flex-shrink-0 px-4 py-3 border-t border-border bg-background">
+          <div className="mb-2">
+            <h3 className="text-sm font-medium text-muted-foreground mb-2">أسئلة مقترحة:</h3>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-2xl mx-auto">
+            {quickChips.slice(0, 6).map((chip, index) => (
+              <motion.button
+                key={`chip-${index}`}
+                onClick={() => handleChipClick(chip)}
+                className="quick-chip text-right hover:scale-105 transition-transform duration-200 shadow-sm hover:shadow-md px-3 py-2 rounded-lg text-sm bg-card border border-border hover:bg-accent hover:text-accent-foreground"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.1 }}
+              >
+                {chip}
+              </motion.button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Input Area - Fixed at bottom */}
       <div className="p-4 border-t border-border bg-background shrink-0">

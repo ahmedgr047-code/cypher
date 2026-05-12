@@ -1,6 +1,6 @@
 import React from 'react';
-import AuthScreen from './sign-up-login-screen/page';
+import { redirect } from 'next/navigation';
 
 export default function RootPage() {
-  return <AuthScreen />;
+  redirect('/chat-interface');
 }
