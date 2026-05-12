@@ -60,6 +60,8 @@ export default function LayoutClient({ children }: LayoutClientProps) {
         
         if (!response.ok) {
           console.log('Profile response not ok:', response.status);
+          setConnectionStatus('error');
+          setLastError(`فشل الاتصال: ${response.status} ${response.statusText}`);
           setAuthState({
             isAuthenticated: false,
             isLoading: false,
@@ -71,6 +73,8 @@ export default function LayoutClient({ children }: LayoutClientProps) {
 
         const user = await response.json();
         console.log('User authenticated:', user);
+        setConnectionStatus('success');
+        setLastError(undefined);
         
         setAuthState({
           isAuthenticated: true,
@@ -131,8 +135,6 @@ export default function LayoutClient({ children }: LayoutClientProps) {
         });
         setConnectionStatus('success');
         setLastError(undefined);
-        // Redirect to chat interface after successful login
-        window.location.href = '/chat-interface';
       } else {
         setAuthState(prev => ({
           ...prev,
@@ -180,8 +182,6 @@ export default function LayoutClient({ children }: LayoutClientProps) {
         });
         setConnectionStatus('success');
         setLastError(undefined);
-        // Redirect to chat interface after successful signup
-        window.location.href = '/chat-interface';
       } else {
         setAuthState(prev => ({
           ...prev,

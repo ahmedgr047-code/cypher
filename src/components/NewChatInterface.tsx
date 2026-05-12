@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Paperclip, Mic, Bot, User, Expand, Menu, RotateCcw, Code2, Activity, Wifi, WifiOff, AlertTriangle } from "lucide-react";
+import { Send, Paperclip, Mic, Bot, User, Expand, Menu, RotateCcw, Code2, Activity, Wifi, WifiOff, AlertTriangle, Sparkles, Zap, Shield, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { StudySheetCard } from "@/components/ui/StudySheetCard";
